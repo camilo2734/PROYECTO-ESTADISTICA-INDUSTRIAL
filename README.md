@@ -17,7 +17,7 @@ app/
   src/                   aplicación web (React + TypeScript)
 docs/
   bitacora_ia.md         bitácora de uso de IA
-  informe.pdf            informe técnico (máximo 8 páginas)
+  Informe_Tecnico_Proyecto4.docx   informe técnico (máximo 8 páginas)
 firebase.json            configuración de Firebase Hosting
 ```
 
