@@ -1,0 +1,16 @@
+# Datos descomprimidos por el Rmd (se regeneran desde archive.zip)
+analisis/datos/bookcrossing/
+analisis/*_files/
+analisis/*_cache/
+.Rhistory
+.RData
+.Rproj.user/
+
+# App
+app/node_modules/
+app/dist/
+.firebase/
+*.log
+.DS_Store
+app/public/datos/
+*.tsbuildinfo

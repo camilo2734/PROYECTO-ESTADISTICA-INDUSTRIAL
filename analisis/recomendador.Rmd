@@ -1,0 +1,1243 @@
+---
+title: "Proyecto 4 — Sistema de recomendación para un marketplace farmacéutico"
+subtitle: "Estadística Industrial · 2026-II · Universidad del Magdalena"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    df_print: kable
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 8, fig.height = 4.2, fig.align = "center")
+# Si el paquete lsa se instaló en una librería de usuario, se agrega a la ruta.
+if (dir.exists("~/Rlib")) .libPaths(c("~/Rlib", .libPaths()))
+
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+library(cluster)   # distancia de Gower (daisy)
+library(lsa)       # cosine(), para validar nuestra función
+library(jsonlite)  # exportación de resultados al prototipo
+
+theme_set(theme_minimal(base_size = 12))
+set.seed(1234)
+t_inicio <- Sys.time()
+
+# Formato de números para el texto (coma decimal)
+pc  <- function(x, d = 1) paste0(formatC(100 * x, format = "f", digits = d, decimal.mark = ","), " %")
+num <- function(x, d = 3) formatC(x, format = "f", digits = d, decimal.mark = ",")
+pv  <- function(x) if (x < 0.001) formatC(x, format = "e", digits = 1, decimal.mark = ",") else num(x, 3)
+```
+
+# Cómo leer este documento {-}
+
+El documento sigue las siete fases del enunciado. La **Parte I** reproduce el tutorial de Ander Fernández con la versión de Kaggle de Book-Crossing (fase 1). La **Parte II** adapta los recomendadores a las facturas de Procaps (fases 2 a 7). Al final se exportan los resultados en JSON, que son el puente con el prototipo web.
+
+Cada bloque de código va precedido de una explicación de **qué hace** y **qué supuesto hace sobre los datos**. Las modificaciones al código original se marcan con la etiqueta **[CAMBIO]**.
+
+Estructura de carpetas esperada (todo relativo a este archivo):
+
+```
+analisis/
+├── recomendador.Rmd
+└── datos/
+    ├── archive.zip   (Book-Crossing, Kaggle)
+    ├── pro2.csv      (detalle de facturas)
+    └── cab.csv       (cabecera de facturas)
+```
+
+# Parte I — Reproducción del tutorial (fase 1)
+
+## Lectura de los datos de Kaggle
+
+El tutorial original descargaba Book-Crossing del sitio de la Universidad de Friburgo, cuyos archivos se llaman `BX-Books.csv`, `BX-Book-Ratings.csv` y `BX-Users.csv`. La versión de Kaggle trae las mismas tres tablas con otros nombres y menos columnas:
+
+| Tabla | Archivo Kaggle | Columnas en Kaggle | Diferencia con el original |
+|---|---|---|---|
+| Libros | `Books.csv` | ISBN, Title, Author, Year, Publisher | No trae las URL de las carátulas (`Image-URL-S/M/L`) |
+| Calificaciones | `Ratings.csv` | User-ID, ISBN, Rating | `Book-Rating` pasa a llamarse `Rating` |
+| Usuarios | `Users.csv` | User-ID, Age | No trae `Location` |
+
+**[CAMBIO]** El código base tomaba los archivos con `list.files()` y los asignaba por posición (`files[1]`, `files[2]`…). Eso depende del orden alfabético del sistema operativo. Aquí se leen por nombre explícito.
+
+```{r leer-books}
+unzip("datos/archive.zip", exdir = "datos/bookcrossing")
+
+books   <- read.csv("datos/bookcrossing/Books.csv",   sep = ";")
+ratings <- read.csv("datos/bookcrossing/Ratings.csv", sep = ";")
+users   <- read.csv("datos/bookcrossing/Users.csv",   sep = ";")
+
+c(libros = nrow(books), calificaciones = nrow(ratings), usuarios = nrow(users))
+```
+
+`read.csv()` convierte `User-ID` en `User.ID` porque los nombres de columna en R no admiten guiones. Por eso el resto del código usa `User.ID`.
+
+## Exploración y categorías aleatorias
+
+```{r glimpse-ratings}
+glimpse(ratings)
+```
+
+El tutorial crea una **categoría aleatoria** para cada libro, porque Book-Crossing no trae género literario. Es importante entender que esta variable **no contiene información real**: sirve solo para ilustrar el recomendador de contenido. Se fija la semilla para que el resultado sea reproducible.
+
+```{r categorias}
+set.seed(1234)
+categories <- c("Action and Adventure", "Classic", "Detective and Mystery", "Fantasy")
+books$category <- sample(categories, nrow(books), replace = TRUE,
+                         prob = c(0.25, 0.3, 0.25, 0.20))
+books$category <- as.factor(books$category)
+rm(categories)
+```
+
+Se antepone un prefijo a los identificadores para que R no los trate como números. Los ISBN con ceros a la izquierda los perderían.
+
+```{r formato-id}
+books$ISBN       <- paste0("Isbn.", books$ISBN)
+users$User.ID    <- paste0("User.", users$User.ID)
+ratings$ISBN     <- paste0("Isbn.", ratings$ISBN)
+ratings$User.ID  <- paste0("User.", ratings$User.ID)
+```
+
+## Distribución de las calificaciones y el problema de los ceros
+
+```{r dist-ratings}
+ratings %>% count(Rating, name = "casos") %>%
+  ggplot(aes(Rating, casos)) + geom_col(fill = "#0F5257") +
+  scale_x_continuous(breaks = 0:10) +
+  labs(title = "Calificaciones en Book-Crossing", x = "Calificación", y = "Casos")
+```
+
+El 0 no es una calificación: significa **interacción implícita sin valoración**. Tratarlo como "le gustó 0 sobre 10" sesgaría el modelo, por eso el tutorial lo elimina. Este mismo razonamiento reaparece en la farmacia, donde no comprar tampoco equivale a "no me gusta".
+
+```{r quitar-ceros}
+ratings <- ratings[ratings$Rating != 0, ]
+
+ratings %>% count(Rating, name = "casos") %>%
+  ggplot(aes(Rating, casos)) + geom_col(fill = "#0F5257") +
+  scale_x_continuous(breaks = 1:10) +
+  labs(title = "Calificaciones explícitas (sin ceros)", x = "Calificación", y = "Casos")
+```
+
+## Filtro de usuarios poco activos
+
+```{r filtro-usuarios}
+ratings_sum <- ratings %>% count(User.ID)
+summary(ratings_sum$n)
+
+user_index <- ratings_sum$User.ID[ratings_sum$n > 4]
+users   <- users[users$User.ID %in% user_index, ]
+ratings <- ratings[ratings$User.ID %in% user_index, ]
+books   <- books[books$ISBN %in% ratings$ISBN, ]
+rm(ratings_sum, user_index)
+
+c(libros = nrow(books), calificaciones = nrow(ratings), usuarios = nrow(users))
+```
+
+El 75 % de los usuarios ha calificado 3 libros o menos. Con tan poca información no se puede estimar su similitud con nadie, así que se conservan solo los usuarios con más de 4 calificaciones. Además, eso reduce el costo de cómputo.
+
+## Recomendador basado en contenido (distancia de Gower)
+
+Las variables de contenido son categóricas (autor, editorial, categoría). Para variables categóricas la **distancia de Gower** compara variable por variable: vale 0 si coinciden y 1 si no. Después promedia, con los pesos que se le indiquen.
+
+El tutorial intenta primero calcular la matriz para **todos** los libros. Con los `r format(nrow(books), big.mark = ".", decimal.mark = ",")` libros que quedan tras el filtro, la matriz tendría unos `r format(round(nrow(books)^2 / 1e9, 1), decimal.mark = ",")` mil millones de celdas, del orden de `r round(nrow(books)^2 * 8 / 1e9)` GB en memoria, y no cabe en un computador normal. **[CAMBIO]** Ese bloque se conserva pero no se ejecuta (`eval = FALSE`):
+
+```{r gower-todo, eval = FALSE}
+books_distance <- books[, c("ISBN", "Author", "Publisher")]
+books_distance[] <- lapply(books_distance, as.factor)
+dissimilarity <- daisy(books_distance, metric = "gower")   # no cabe en memoria
+matrix(ncol = 115246, nrow = 115246)                        # ídem
+```
+
+Como en el tutorial, se usan los primeros 10.000 libros. Se pondera el autor (2) por encima de la categoría (1) y de la editorial (0,5): dos libros se parecen más por compartir autora que por compartir editorial.
+
+```{r gower-10000}
+n_libros <- 10000
+book_feature <- books[1:n_libros, c("Author", "Publisher", "category")]
+book_feature[] <- lapply(book_feature, as.factor)
+
+dissimilarity <- daisy(book_feature, metric = "gower", weights = c(2, 0.5, 1))
+dissimilarity <- as.matrix(dissimilarity)
+rownames(dissimilarity) <- books$ISBN[1:n_libros]
+colnames(dissimilarity) <- books$ISBN[1:n_libros]
+
+round(dissimilarity[15:20, 15:20], 3)
+```
+
+Con tres variables categóricas y pesos 2, 0,5 y 1 (suma 3,5), la disimilitud solo puede tomar unos pocos valores: 0 (coinciden las tres), 0,143 (autor y categoría), 0,571 (solo el autor), 0,714 (solo la categoría), 0,857 (solo la editorial) y 1 (ninguna). Por eso la matriz se ve "escalonada".
+
+### Recomendaciones para un usuario
+
+```{r usuario-contenido}
+user_id <- "User.1167"
+user_books <- ratings %>%
+  filter(User.ID == user_id & ISBN %in% books$ISBN[1:n_libros]) %>%
+  arrange(desc(Rating))
+user_books
+```
+
+**[CAMBIO — corrección de un error del código base].** En la función original el `left_join` unía la calificación por `recommended_book` y después filtraba `!is.na(Rating)`. El efecto era que solo quedaban como "recomendación" los libros que el usuario **ya había calificado**, que es justo lo contrario de lo buscado. La versión corregida:
+
+1. une la calificación por el libro **leído** (`readed_book`), que es el que pondera la similitud;
+2. excluye explícitamente los libros que el usuario ya leyó;
+3. se queda con la mejor puntuación de cada candidato (`slice_max`) y con los `n` mejores candidatos en total.
+
+```{r recomendar-contenido}
+recomendar <- function(selected_books, dissimilarity_matrix, books, n_recommendations = 5) {
+  selected_book_indexes <- which(colnames(dissimilarity_matrix) %in% selected_books$ISBN)
+
+  results <- data.frame(dissimilarity_matrix[, selected_book_indexes, drop = FALSE],
+                        recommended_book = rownames(dissimilarity_matrix),
+                        stringsAsFactors = FALSE, check.names = FALSE)
+
+  results %>%
+    pivot_longer(cols = -recommended_book, names_to = "readed_book",
+                 values_to = "dissimilarity") %>%
+    left_join(selected_books, by = c("readed_book" = "ISBN")) %>%     # [CAMBIO]
+    filter(!recommended_book %in% selected_books$ISBN) %>%            # [CAMBIO]
+    mutate(similarity = 1 - dissimilarity,
+           weighted_score = similarity * Rating) %>%
+    filter(weighted_score > 0) %>%
+    group_by(recommended_book) %>%
+    slice_max(weighted_score, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    slice_max(weighted_score, n = n_recommendations, with_ties = FALSE) %>%
+    left_join(books, by = c("recommended_book" = "ISBN")) %>%
+    select(recommended_book, readed_book, Rating, similarity, weighted_score,
+           Title, Author, Publisher, category)
+}
+
+selected_books <- user_books[, c("ISBN", "Rating")]
+recomendaciones <- recomendar(selected_books, dissimilarity, books)
+recomendaciones
+```
+
+Cada recomendación hereda la calificación del libro leído al que más se parece. Así un libro similar a uno calificado con 10 tiene prioridad sobre uno similar a un libro calificado con 5.
+
+**Visualización.** El tutorial mostraba las carátulas con `readJPEG`. La versión de Kaggle no trae las URL, así que esa parte no puede reproducirse. En el proyecto, la visualización se traslada al prototipo web, como indica el enunciado.
+
+## Colaborativo basado en ítems (similitud de coseno)
+
+**[CAMBIO].** El código base construía la matriz usuario–libro con `ratings %>% top_n(10000)`. `top_n()` sin argumento ordena por la **última columna** (`Rating`) y conserva todos los empates. No toma "10.000 filas" sino todas las calificaciones iguales a 10, y genera una matriz enorme y sesgada hacia usuarios que solo ponen 10. Aquí se toman explícitamente los **1.000 libros con más calificaciones**, que es la intención del tutorial: reducir el tamaño y dejar libros con información suficiente.
+
+```{r user-item-books}
+top_books <- ratings %>% count(ISBN, sort = TRUE) %>% slice_head(n = 1000) %>% pull(ISBN)
+
+user_item <- ratings %>%
+  filter(ISBN %in% top_books) %>%
+  pivot_wider(names_from = ISBN, values_from = Rating) %>%
+  as.data.frame()
+rownames(user_item) <- user_item$User.ID
+user_item$User.ID <- NULL
+user_item <- as.matrix(user_item)
+
+dim(user_item)
+user_item[1:5, 1:5]
+```
+
+La mayoría de las celdas son `NA`, porque cada usuario solo califica unos pocos libros. A esto se le llama *sparsity* (dispersión):
+
+```{r sparsity-books}
+sum(is.na(user_item)) / (ncol(user_item) * nrow(user_item))
+```
+
+La **similitud de coseno** mide el ángulo entre dos vectores de calificaciones. Vale 1 si apuntan en la misma dirección y 0 si no comparten nada. Con `na.rm = TRUE` los `NA` se ignoran, lo que equivale a tratarlos como 0.
+
+```{r coseno-books}
+cos_similarity <- function(A, B) {
+  num <- sum(A * B, na.rm = TRUE)
+  den <- sqrt(sum(A^2, na.rm = TRUE)) * sqrt(sum(B^2, na.rm = TRUE))
+  num / den
+}
+```
+
+**[CAMBIO — corrección de un error del código base].** La función original buscaba el libro en `rownames()`, pero las filas de la matriz son **usuarios**. El índice salía vacío y la similitud no se calculaba contra el libro pedido. La versión corregida busca el libro en las **columnas** y compara columna contra columna.
+
+```{r item-rec-books}
+item_recommendation_books <- function(book_id, rating_matrix = user_item, n_recommendations = 5) {
+  book_index <- which(colnames(rating_matrix) == book_id)            # [CAMBIO]
+  similarity <- apply(rating_matrix, 2, function(y)
+    cos_similarity(rating_matrix[, book_index], y))
+
+  tibble(ISBN = names(similarity), similarity = similarity) %>%
+    filter(ISBN != book_id) %>%
+    slice_max(similarity, n = n_recommendations, with_ties = FALSE) %>%
+    left_join(books %>% select(ISBN, Title, Author), by = "ISBN")
+}
+
+libro <- if ("Isbn.0446677451" %in% colnames(user_item)) "Isbn.0446677451" else top_books[1]
+books %>% filter(ISBN == libro) %>% select(ISBN, Title, Author)
+item_recommendation_books(libro)
+```
+
+## Colaborativo basado en usuarios
+
+Es la misma matriz, pero ahora la similitud se calcula **entre filas**: se buscan los `nearest_neighbors` usuarios más parecidos y se recomiendan los libros que ellos calificaron y el usuario no ha leído. El parámetro `threshold` exige que el libro lo hayan calificado **más de** `threshold` vecinos.
+
+```{r user-rec-books}
+user_recommendation_books <- function(user_id, user_item_matrix = user_item,
+                                      ratings_matrix = ratings, n_recommendations = 5,
+                                      threshold = 1, nearest_neighbors = 10) {
+  user_index <- which(rownames(user_item_matrix) == user_id)
+  similarity <- apply(user_item_matrix, 1, function(y)
+    cos_similarity(user_item_matrix[user_index, ], y))
+
+  similar_users <- tibble(User.ID = names(similarity), similarity = similarity) %>%
+    filter(User.ID != user_id) %>%
+    slice_max(similarity, n = nearest_neighbors, with_ties = FALSE)
+
+  readed_books_user <- ratings_matrix$ISBN[ratings_matrix$User.ID == user_id]
+
+  ratings_matrix %>%
+    filter(User.ID %in% similar_users$User.ID, !(ISBN %in% readed_books_user)) %>%
+    group_by(ISBN) %>%
+    summarise(count = n(), Rating = mean(Rating)) %>%
+    filter(count > threshold) %>%
+    arrange(desc(Rating), desc(count)) %>%
+    head(n_recommendations) %>%
+    left_join(books %>% select(ISBN, Title, Author), by = "ISBN")
+}
+
+usuario <- if ("User.99" %in% rownames(user_item)) "User.99" else
+  names(sort(rowSums(!is.na(user_item)), decreasing = TRUE))[1]
+user_recommendation_books(usuario, n_recommendations = 10)
+```
+
+## Supuestos de cada recomendador del tutorial
+
+| Recomendador | Qué hace | Supuesto sobre los datos |
+|---|---|---|
+| Contenido (Gower) | Recomienda libros parecidos en autor, editorial y categoría a los que el usuario calificó alto | Las características describen bien el gusto. La categoría aquí es aleatoria, así que no aporta información real |
+| Ítem–ítem (coseno) | Recomienda libros cuyas calificaciones se parecen a las del libro dado | Los libros calificados por las mismas personas son sustitutos o complementos; un `NA` equivale a 0 |
+| Usuario–usuario (coseno) | Recomienda lo que calificaron los vecinos más parecidos | Usuarios con gustos pasados parecidos tendrán gustos futuros parecidos |
+
+```{r limpiar-parte1, include = FALSE}
+rm(books, ratings, users, book_feature, dissimilarity, user_item, recomendaciones,
+   selected_books, user_books, top_books)
+invisible(gc())
+```
+
+# Parte II — Adaptación al marketplace de Procaps
+
+## Fase 2. Cargar, limpiar y unir
+
+### Lectura
+
+Los archivos están en Latin-1 y usan el punto como separador de miles. `read_csv2()` asume el `;` como separador de campos. Con `grouping_mark = "."`, `readr` asigna automáticamente la coma como separador decimal, de modo que `4.300` se lee como 4300. Los identificadores se leen como texto: son códigos, no cantidades, y no deben sumarse ni perder ceros.
+
+```{r leer-farmacia}
+loc <- locale(encoding = "latin1", grouping_mark = ".")
+
+detalle <- read_csv2("datos/pro2.csv", locale = loc,
+                     col_types = cols(invoice = col_character(),
+                                      Material = col_character(),
+                                      .default = col_guess()))
+cabecera <- read_csv2("datos/cab.csv", locale = loc,
+                      col_types = cols(invoice = col_character(),
+                                       colaborador = col_character(),
+                                       .default = col_guess())) %>%
+  mutate(fecha = as.Date(fecha, format = "%d/%m/%Y"))
+
+glimpse(detalle)
+glimpse(cabecera)
+```
+
+### Verificación de la unión
+
+Antes de unir hay que saber si `invoice` identifica **una sola** cabecera. Si una factura tuviera dos cabeceras, la unión duplicaría sus líneas.
+
+```{r verif-union}
+verif <- tibble(
+  `Líneas de detalle`                 = nrow(detalle),
+  `Facturas distintas en el detalle`  = n_distinct(detalle$invoice),
+  `Cabeceras`                         = nrow(cabecera),
+  `Facturas repetidas en cabecera`    = sum(duplicated(cabecera$invoice)),
+  `Líneas sin cabecera`               = nrow(anti_join(detalle, cabecera, by = "invoice")),
+  `Cabeceras sin detalle`             = nrow(anti_join(cabecera, detalle, by = "invoice"))
+)
+t(verif)
+```
+
+Se usa un **`inner_join`**. Cada cabecera es única, así que la relación es de muchos a uno y no puede duplicar líneas. Además, todas las líneas tienen cabecera, así que tampoco se pierde ninguna. Las `r verif[["Cabeceras sin detalle"]]` cabeceras sin detalle son facturas sin productos y no aportan información de compra; un `left_join` desde el detalle daría exactamente el mismo resultado.
+
+```{r union}
+compras <- inner_join(detalle, cabecera, by = "invoice")
+stopifnot(nrow(compras) == nrow(detalle))   # ni se pierden ni se duplican filas
+nrow(compras)
+```
+
+### Nombre canónico de cada producto
+
+```{r nombre-canonico}
+desc_por_material <- compras %>% distinct(Material, description) %>% count(Material)
+sum(desc_por_material$n > 1)
+```
+
+`r sum(desc_por_material$n > 1)` productos aparecen con más de una descripción: cambios de empaque, promociones o nombres comerciales distintos según el periodo. Para mostrar un solo nombre, se toma como **nombre canónico** la descripción con más unidades vendidas. La identidad del producto sigue siendo `Material`.
+
+```{r productos}
+productos <- compras %>%
+  group_by(Material, description) %>%
+  summarise(u = sum(cantidad), .groups = "drop") %>%
+  group_by(Material) %>% slice_max(u, n = 1, with_ties = FALSE) %>% ungroup() %>%
+  select(Material, nombre = description) %>%
+  left_join(compras %>% group_by(Material) %>%
+              summarise(unidades = sum(cantidad),
+                        compradores = n_distinct(colaborador),
+                        facturas = n_distinct(invoice),
+                        iva = as.integer(names(which.max(table(IVA)))),
+                        formula_medica = names(which.max(table(`formula medica`))),
+                        precio_mediano = median(`Precio Neto`)),
+            by = "Material") %>%
+  arrange(desc(unidades))
+head(productos, 10)
+```
+
+### Resumen descriptivo
+
+```{r resumen}
+tibble(
+  Compradores = n_distinct(compras$colaborador),
+  Productos   = n_distinct(compras$Material),
+  Facturas    = n_distinct(compras$invoice),
+  Desde       = min(compras$fecha),
+  Hasta       = max(compras$fecha)
+)
+summary(compras$cantidad)
+```
+
+```{r graf-cantidad}
+compras %>% count(cantidad) %>%
+  ggplot(aes(factor(cantidad), n)) + geom_col(fill = "#0F5257") +
+  scale_y_log10(labels = scales::label_comma(big.mark = ".")) +
+  labs(title = "Unidades por línea de factura", x = "Cantidad", y = "Líneas (escala log)")
+```
+
+```{r graf-tiempo}
+compras %>% mutate(mes = as.Date(format(fecha, "%Y-%m-01"))) %>%
+  group_by(mes) %>% summarise(facturas = n_distinct(invoice)) %>%
+  ggplot(aes(mes, facturas)) + geom_line(color = "#0F5257") +
+  geom_vline(xintercept = as.Date("2021-01-01"), linetype = 2, color = "#E4572E") +
+  annotate("text", x = as.Date("2021-01-01"), y = Inf, vjust = 1.5, hjust = -0.05,
+           label = "corte entrenamiento / prueba", color = "#E4572E", size = 3.5) +
+  labs(title = "Facturas por mes", x = NULL, y = "Facturas")
+```
+
+```{r concentracion}
+conc <- productos %>% mutate(part = unidades / sum(unidades), acum = cumsum(part))
+c(`Productos que concentran el 50 % de las unidades` = sum(conc$acum <= 0.5) + 1,
+  `Participación del producto más vendido (%)` = round(100 * conc$part[1], 1))
+head(productos %>% select(nombre, unidades, compradores), 10)
+```
+
+La demanda está muy concentrada: unos pocos productos explican la mitad de las unidades. Por eso la línea base de "los más vendidos" es exigente y un recomendador ingenuo tiende a sugerir siempre lo mismo.
+
+```{r canales}
+compras %>% count(`Creado desde`, `Sociedad facturadora`)
+```
+
+### Forma farmacéutica (variable derivada)
+
+Los datos no traen la forma farmacéutica, pero la descripción sí la menciona con abreviaturas: CBG = cápsula blanda de gelatina, CD = cápsula dura, TAB = tableta, JBE = jarabe, etc. Se deriva con reglas de texto, en orden de prioridad. Se usa para el recomendador de contenido (bonificación) y para que cada producto se muestre en el prototipo con un empaque fiel a su presentación. **Es una variable derivada de `description`, no un dato inventado.**
+
+```{r forma}
+forma_farmaceutica <- function(d) {
+  d <- toupper(d)
+  has <- function(p) grepl(p, d, perl = TRUE)
+  case_when(
+    has("TAPA ?BOCAS|PROTEKTA|KN95")                                  ~ "Tapabocas",
+    has("TEST COVID")                                                 ~ "Prueba diagnóstica",
+    has("AGUJ|JERINGA PRA|NANOPASS")                                  ~ "Agujas y jeringas",
+    has("GLUC[OÓ]METRO|TENSI[OÓ]METRO|TERM[OÓ]METRO|B[AÁ]SCULA|DIAMOND (VOICE|MINI)|BRAZALETE|MEDIDOR") ~ "Equipo médico",
+    has("TIRAS|LANCETA|LANREG")                                       ~ "Tiras y lancetas",
+    has("TROLLI|GLOWWORMS|CLASSIC BEARS|SQUIGGLES|CATERPILLAR")      ~ "Confitería",
+    has("TRANSDERM")                                                  ~ "Parche transdérmico",
+    has("OFT|SOL ESP|LAGRIFRESH")                                     ~ "Solución oftálmica",
+    has("OVUL|CAP VAGINAL|CREMA VAGINAL|ILANA")                       ~ "Uso vaginal",
+    has("INY|AMP\\b|AMPOLLA|JER(ING)?A? PRELL|JER CIAL|VIAL CAJA|BIOFIGRAN") ~ "Inyectable",
+    has("SPRAY|AEROSOL|DICLOFEN CAJA DUO")                            ~ "Spray o aerosol",
+    has("UNGU|POMADA")                                                ~ "Ungüento",
+    has("BARRA")                                                      ~ "Jabón en barra",
+    has("CREMA|DRYDERMA")                                             ~ "Crema",
+    has("LOCION|LOTION|SOL TOPICA|SAFORELLE|ACAR KLEAN|ETONIC|BLEFADEX") ~ "Loción o solución tópica",
+    has("JBE|JARABE|JALEA")                                           ~ "Jarabe",
+    has("SUSP|\\bSUS\\b|FLUXAL")                                      ~ "Suspensión",
+    has("GOTAS|\\bGOT\\b|SOL ORAL|SOL CJA|HORSE|\\bEC VET")           ~ "Gotas o solución oral",
+    has("GOMA|GOMITA|GUMIVIT|GUMMY|GUMI |BONFIBRA")                   ~ "Gomas",
+    has("LATA|TARRO|BOTELLA|DELISOY|PREVENTIA SOY|GLUVID|NOVAMIL")    ~ "Polvo en lata o tarro",
+    has("SOB|SACH|POLVO|\\bPOL\\b|POLV|NUTRIGEL|ECOSYS|BIOFLOR")      ~ "Polvo en sobres",
+    has("G-?TABS?|\\bGTAB|GELTAB")                                    ~ "Tableta",
+    has("CBG|\\bCAPS?\\b|CAPSULA|UNIGEL|\\bCB\\b|OMEGA|VITYBELL|PLENIV|VISOMEGA|EPAPURE|PROMEGA|CROMEGA") ~ "Cápsula blanda",
+    has("\\bCD\\b")                                                   ~ "Cápsula dura",
+    has("VIT\\.?E|VITAMINA E|UVA|MULTIVIT M|VARTERAL")                 ~ "Cápsula blanda",
+    has("TAB|COMP|\\bMG\\b|\\bUND\\b|\\bUN\\b|CJA|CAJA")              ~ "Tableta",
+    TRUE                                                              ~ "Otro"
+  )
+}
+
+productos <- productos %>% mutate(forma = forma_farmaceutica(nombre))
+productos %>% count(forma, sort = TRUE)
+```
+
+```{r forma-otro}
+productos %>% filter(forma == "Otro") %>% select(Material, nombre)
+```
+
+## Fase 3. Preferencia implícita y matriz usuario–producto
+
+En la farmacia no hay calificaciones: solo sabemos **cuánto** y **cuántas veces** compró cada persona cada producto. Se comparan cuatro definiciones de preferencia $r_{ui}$ del comprador $u$ por el producto $i$:
+
+| Definición | Fórmula | Qué captura | Sesgo |
+|---|---|---|---|
+| Suma de unidades | $\sum q_{ui}$ | Volumen | Un mayorista que compra 263 unidades pesa 263 veces más que alguien que compró 1 |
+| Facturas distintas | $\#\{\text{facturas con } i\}$ | Recompra, hábito | Menos sensible al volumen; favorece productos de uso crónico |
+| Binaria | $\mathbb{1}[\text{compró}]$ | Solo si compró | Ignora la intensidad: una compra única pesa igual que veinte |
+| Logarítmica | $\log(1 + \sum q_{ui})$ | Volumen con rendimientos decrecientes | Comprime la cola larga: de 1 a 263 unidades pasa a valores entre 0,69 y 5,58 |
+
+```{r agregado}
+agregar <- function(df) {
+  df %>% group_by(colaborador, Material) %>%
+    summarise(unidades = sum(cantidad), facturas = n_distinct(invoice), .groups = "drop")
+}
+
+preferencia <- function(agg, tipo) {
+  switch(tipo,
+         suma     = agg$unidades,
+         facturas = agg$facturas,
+         binaria  = rep(1, nrow(agg)),
+         log      = log1p(agg$unidades))
+}
+
+catalogo <- sort(productos$Material)   # las 732 columnas, en orden fijo
+
+matriz_up <- function(agg, tipo, usuarios = sort(unique(agg$colaborador))) {
+  M <- matrix(0, nrow = length(usuarios), ncol = length(catalogo),
+              dimnames = list(usuarios, catalogo))
+  idx <- cbind(match(agg$colaborador, usuarios), match(agg$Material, catalogo))
+  ok  <- !is.na(idx[, 1])
+  M[idx[ok, , drop = FALSE]] <- preferencia(agg, tipo)[ok]
+  M
+}
+
+agg_total <- agregar(compras)
+summary(agg_total$unidades)
+```
+
+### Dispersión
+
+La dispersión se calcula sobre **todas** las celdas posibles: compradores × productos del catálogo completo. No cambia con la definición de preferencia, porque las cuatro tienen las mismas celdas vacías.
+
+```{r dispersion}
+M_bin <- matriz_up(agg_total, "binaria")
+dispersion <- 1 - sum(M_bin > 0) / length(M_bin)
+tibble(Compradores = nrow(M_bin), Productos = ncol(M_bin),
+       `Celdas con compra` = sum(M_bin > 0),
+       `Dispersión (%)` = round(100 * dispersion, 2),
+       `Mediana de productos por comprador` = median(rowSums(M_bin)))
+```
+
+La matriz está vacía en un `r round(100*dispersion, 1)` %. Es mucho menos que el 99,96 % de los libros: hay más información por comprador, y por eso es razonable usar el filtrado colaborativo.
+
+### ¿Qué definición evita que un mayorista domine la similitud?
+
+El coseno entre dos productos depende de las normas de sus columnas, $\|r_{\cdot i}\| = \sqrt{\sum_u r_{ui}^2}$. Si un comprador concentra casi toda la norma de una columna, la similitud de ese producto con los demás refleja **los gustos de esa sola persona**. Se mide, para cada producto, la **participación del comprador dominante** en la norma al cuadrado:
+
+$$D_i = \frac{\max_u r_{ui}^2}{\sum_u r_{ui}^2}$$
+
+```{r dominancia}
+dominancia <- function(M) {
+  num <- apply(M, 2, function(x) max(x^2))
+  den <- colSums(M^2)
+  (num / den)[den > 0]
+}
+tipos <- c("suma", "facturas", "binaria", "log")
+dom <- bind_rows(lapply(tipos, function(t)
+  tibble(preferencia = t, D = dominancia(matriz_up(agg_total, t)))))
+
+dom %>% group_by(preferencia) %>%
+  summarise(`D mediana` = median(D), `D percentil 90` = quantile(D, 0.9),
+            `Productos con D > 0,5` = sum(D > 0.5)) %>%
+  arrange(`D mediana`)
+
+ggplot(dom, aes(preferencia, D)) + geom_boxplot(fill = "#B8D8D3", outlier.alpha = 0.3) +
+  labs(title = "Peso del comprador dominante en cada producto",
+       x = "Definición de preferencia", y = expression(D[i]))
+```
+
+La dominancia es solo un criterio. La decisión se toma también por **capacidad predictiva**: con cada definición se construyen los dos recomendadores colaborativos y se mide cuántos compradores reciben al menos una recomendación que efectivamente compraron después. Para no usar los datos de prueba (2021–2022, reservados para la fase 7), se entrena con las compras hasta 2019 y se valida con las de 2020. El diseño completo de la evaluación se explica en la fase 7; aquí se usa el mismo motor.
+
+```{r motor-eval}
+# Funciones de álgebra matricial (se explican y validan en las fases 4 a 6)
+sim_items <- function(M) {            # coseno entre columnas (productos)
+  n <- sqrt(colSums(M^2)); n[n == 0] <- 1
+  Mn <- sweep(M, 2, n, "/")
+  S <- crossprod(Mn)
+  diag(S) <- 0                        # un producto no se recomienda a sí mismo
+  S
+}
+comunes <- function(M) { B <- (M > 0) * 1; C <- crossprod(B); diag(C) <- 0; C }
+normalizar_filas <- function(M) { n <- sqrt(rowSums(M^2)); n[n == 0] <- 1; M / n }
+
+partir <- function(fin_train, ini_test, fin_test) {
+  tr <- compras %>% filter(fecha <= fin_train)
+  te <- compras %>% filter(fecha >= ini_test, fecha <= fin_test)
+  agg_tr <- agregar(tr)
+  nuevos <- te %>% distinct(colaborador, Material) %>%
+    anti_join(agg_tr %>% select(colaborador, Material), by = c("colaborador", "Material"))
+  usuarios_eval <- intersect(unique(agg_tr$colaborador), unique(nuevos$colaborador))
+  list(tr = tr, agg = agg_tr, objetivo = split(nuevos$Material, nuevos$colaborador)[usuarios_eval],
+       usuarios = usuarios_eval)
+}
+
+top_validos <- function(score, excluir, n = 10) {
+  score[excluir] <- -Inf
+  idx <- order(score, decreasing = TRUE)[1:n]
+  idx[is.finite(score[idx]) & score[idx] > 0]
+}
+
+# Devuelve una lista: comprador -> vector de Material recomendados
+recs_popularidad <- function(P, excluir_comprados = TRUE, n = 10) {
+  pop <- P$tr %>% group_by(Material) %>% summarise(u = sum(cantidad)) %>%
+    right_join(tibble(Material = catalogo), by = "Material") %>%
+    mutate(u = coalesce(u, 0)) %>% arrange(match(Material, catalogo)) %>% pull(u)
+  M <- matriz_up(P$agg, "binaria")
+  lapply(setNames(P$usuarios, P$usuarios), function(u)
+    catalogo[top_validos(pop, if (excluir_comprados) M[u, ] > 0 else rep(FALSE, length(pop)), n)])
+}
+
+recs_item <- function(P, tipo, min_comunes = 5, S_extra = NULL, alfa = 1, n = 10,
+                      ajustado = FALSE) {
+  M <- matriz_up(P$agg, tipo)
+  S <- (if (ajustado) sim_items_ajustada(M) else sim_items(M)) * (comunes(M) >= min_comunes)
+  if (!is.null(S_extra)) S <- alfa * S + (1 - alfa) * S_extra
+  U <- M[P$usuarios, , drop = FALSE]
+  SC <- U %*% S
+  lapply(setNames(P$usuarios, P$usuarios), function(u)
+    catalogo[top_validos(SC[u, ], U[u, ] > 0, n)])
+}
+
+recs_usuario <- function(P, tipo, k = 20, umbral = 2, n = 10) {
+  M <- matriz_up(P$agg, tipo); Mu <- normalizar_filas(M); B <- M > 0
+  SIM <- tcrossprod(Mu[P$usuarios, , drop = FALSE], Mu)
+  lapply(setNames(P$usuarios, P$usuarios), function(u) {
+    s <- SIM[u, ]; s[u] <- 0
+    nb <- head(order(s, decreasing = TRUE), k); nb <- nb[s[nb] > 0]
+    score <- as.vector(s[nb] %*% M[nb, , drop = FALSE])
+    score[colSums(B[nb, , drop = FALSE]) < umbral] <- 0
+    catalogo[top_validos(score, B[u, ], n)]
+  })
+}
+
+metricas <- function(recs, P, modelo) {
+  aciertos <- mapply(function(r, t) sum(r %in% t), recs[P$usuarios], P$objetivo[P$usuarios])
+  tibble(modelo = modelo, colaborador = P$usuarios,
+         hit = as.integer(aciertos > 0), precision = aciertos / 10,
+         n_recs = lengths(recs[P$usuarios]))
+}
+
+resumen <- function(m) m %>% group_by(modelo) %>%
+  summarise(compradores = n(), hit_rate = mean(hit), precision = mean(precision),
+            .groups = "drop")
+```
+
+
+```{r validacion-split}
+PV <- partir(as.Date("2019-12-31"), as.Date("2020-01-01"), as.Date("2020-12-31"))
+cat("Compradores evaluados en validación:", length(PV$usuarios), "\n")
+```
+
+### Comparación predictiva (validación 2020)
+
+```{r val-preferencia}
+val_pref <- bind_rows(lapply(tipos, function(t) bind_rows(
+  metricas(recs_item(PV, t), PV, "Ítem–ítem") %>% mutate(preferencia = t),
+  metricas(recs_usuario(PV, t), PV, "Usuario–usuario") %>% mutate(preferencia = t))))
+
+val_pref %>% group_by(preferencia, modelo) %>%
+  summarise(hit_rate = mean(hit), precision = mean(precision), .groups = "drop") %>%
+  pivot_wider(names_from = modelo, values_from = c(hit_rate, precision)) %>%
+  arrange(desc(`hit_rate_Ítem–ítem`))
+```
+
+**Regla de decisión.** Se promedia el hit rate de validación de los dos recomendadores colaborativos. Las definiciones a menos de 0,5 puntos porcentuales de la mejor se consideran empatadas en la práctica. Entre ellas se elige la de **menor dominancia** $D_i$ mediana, es decir, la que menos depende de un solo comprador.
+
+```{r eleccion-pref}
+puntaje_pref <- val_pref %>% group_by(preferencia) %>% summarise(hit_promedio = mean(hit)) %>%
+  left_join(dom %>% group_by(preferencia) %>% summarise(D_mediana = median(D)), by = "preferencia") %>%
+  arrange(desc(hit_promedio))
+empatadas <- puntaje_pref %>% filter(hit_promedio >= max(hit_promedio) - 0.005)
+pref_elegida <- empatadas$preferencia[which.min(empatadas$D_mediana)]
+puntaje_pref
+pref_elegida
+```
+
+
+
+
+**Resultado y justificación.**
+
+- La **suma de unidades** es la peor definición en los dos recomendadores y la de mayor dominancia (`r sum(dom$D[dom$preferencia == "suma"] > 0.5)` productos donde un solo comprador aporta más de la mitad de la norma). Confirma lo que anticipaba la pregunta guía: el volumen de unos pocos compradores grandes distorsiona la similitud.
+- **Facturas** y **log(1+cantidad)** empatan en el promedio (`r pc(max(puntaje_pref$hit_promedio))`). La **binaria** queda a `r num(100 * (max(puntaje_pref$hit_promedio) - puntaje_pref$hit_promedio[puntaje_pref$preferencia == "binaria"]), 2)` puntos porcentuales, dentro del margen de empate práctico.
+- Entre las empatadas, la definición elegida es **`r pref_elegida`**, que tiene la dominancia mediana más baja (`r num(puntaje_pref$D_mediana[puntaje_pref$preferencia == pref_elegida], 4)`). Ningún comprador, por grande que sea, pesa más que otro en la similitud entre productos.
+- **Interpretación.** En este marketplace, *qué* compra una persona informa sobre su perfil casi tanto como *cuánto* compra, y la versión binaria es la más robusta frente a mayoristas. Su costo es que no distingue entre quien compró un producto una vez y quien lo compra todos los meses. Esa información no se pierde del todo: se usa en la aplicación para ordenar el historial del comprador.
+
+En esta comparación el usuario–usuario usa valores provisionales ($k$ = 20, umbral = 2). Sus valores definitivos se eligen en la fase 7 con la definición ya fijada. **Desde la fase 4 en adelante, todo usa la definición elegida.**
+
+
+## Fase 4. Similitud de coseno
+
+### Interpretación geométrica
+
+Cada producto es un vector en un espacio de `r nrow(M_bin)` dimensiones, una por comprador. El coseno es
+
+$$\cos(\theta_{ij}) = \frac{r_{\cdot i}\cdot r_{\cdot j}}{\|r_{\cdot i}\|\,\|r_{\cdot j}\|}$$
+
+Como todas las preferencias son $\ge 0$, el coseno va de 0 (nadie compró ambos) a 1 (exactamente el mismo patrón de compra, salvo escala). Un **coseno de 0,8** corresponde a un ángulo de $\arccos(0{,}8) \approx 36{,}9^\circ$: los dos productos los compran en gran medida las mismas personas y en proporciones parecidas. Como el coseno no depende de la longitud de los vectores, un producto masivo y uno de nicho pueden tener coseno alto si los compra el mismo grupo.
+
+### Función propia y validación contra `lsa::cosine`
+
+Se reutiliza `cos_similarity()` de la Parte I y se valida en cinco pares. Uno de ellos tiene un producto sin compradores en común, donde el coseno debe ser 0.
+
+```{r validar-coseno}
+M_pref <- matriz_up(agg_total, pref_elegida)   # definición elegida en la fase 3
+nom <- setNames(productos$nombre, productos$Material)
+
+pares <- list(c("300000712", "300001554"),   # Ginkgo  vs Nistatina+óxido de zinc
+              c("300000714", "300000869"),   # Vitamina E 1000 vs Vitamina E 400
+              c("300001535", "300001536"),   # Clotrimazol tópico vs vaginal
+              c("300000750", "300001299"),   # Loratadina vs Levocetirizina
+              c("300005330", "500000122"))   # dos productos casi sin ventas
+
+validacion <- bind_rows(lapply(pares, function(p) {
+  a <- M_pref[, p[1]]; b <- M_pref[, p[2]]
+  propia <- cos_similarity(a, b)
+  ref <- if (sum(a^2) > 0 && sum(b^2) > 0) as.numeric(lsa::cosine(a, b)) else NA
+  tibble(producto_1 = nom[p[1]], producto_2 = nom[p[2]],
+         compradores_comunes = sum(a > 0 & b > 0),
+         propia = propia, lsa = ref, diferencia = abs(propia - ref))
+}))
+validacion
+stopifnot(all(validacion$diferencia < 1e-12, na.rm = TRUE))
+```
+
+### Matriz producto–producto completa (732 × 732)
+
+En lugar de aplicar la función par por par (732 × 732 = 535.824 llamadas), se calcula toda la matriz con álgebra matricial. Se normaliza cada columna a norma 1 y $S = \tilde R^\top \tilde R$. Es el mismo coseno, y se verifica que coincide con la función propia.
+
+```{r sim-items}
+S_pref <- sim_items(M_pref)
+C_all <- comunes(M_pref)
+
+# Verificación: la matriz coincide con la función propia en 20 pares al azar
+set.seed(42)
+muestra <- matrix(sample(catalogo, 40, replace = TRUE), ncol = 2)
+max(abs(apply(muestra, 1, function(p) cos_similarity(M_pref[, p[1]], M_pref[, p[2]])) -
+        S_pref[muestra]), na.rm = TRUE)
+```
+
+**Soporte mínimo.** Un coseno alto con solo uno o dos compradores en común no es evidencia estadística de nada: puede ser coincidencia. Por eso se exige un mínimo de compradores en común, `min_comunes`, para aceptar una similitud. El valor se fija en la validación (fase 7).
+
+## Fase 5. Recomendador ítem–ítem
+
+```{r item-rec}
+item_recommendation <- function(material, S = S_pref, C = C_all, n = 10, min_comunes = 5) {
+  stopifnot(material %in% colnames(S))
+  tibble(Material = colnames(S), similitud = S[material, ], comunes = C[material, ]) %>%
+    filter(Material != material, comunes >= min_comunes, similitud > 0) %>%
+    slice_max(similitud, n = n, with_ties = FALSE) %>%
+    left_join(productos %>% select(Material, nombre, forma), by = "Material") %>%
+    mutate(similitud = round(similitud, 3),
+           explicacion = paste0(comunes, " compradores de «", nom[material],
+                                "» también compraron este producto"))
+}
+
+buscar <- function(texto) productos %>% filter(grepl(texto, nombre, ignore.case = TRUE)) %>%
+  select(Material, nombre, unidades)
+buscar("LORATADINA")
+```
+
+### Casos analizados con criterio farmacéutico
+
+Se analizan productos de **categorías terapéuticas distintas**. La pregunta es si los productos sugeridos tienen sentido como sustitutos (otra presentación del mismo principio activo) o como complementos (productos que se usan juntos).
+
+```{r casos-item}
+casos <- c(
+  "Suplemento (Ginkgo Biloba)"          = "300000712",
+  "Dermatológico (Nistatina + ZnO)"     = "300001554",
+  "Ginecológico (Clotrimazol vaginal)"  = "300001536",
+  "Antialérgico (Loratadina 10 mg)"     = "300000750",
+  "Diabetes (Metformina 850 mg)"        = "300001925",
+  "Gastrointestinal (Omeprazol 20 mg)"  = "300000628",
+  "Oftálmico (Lagrifresh)"              = "300000057",
+  "Nutrición infantil (Novamil 1)"      = "500000293"
+)
+tabla_casos <- bind_rows(lapply(names(casos), function(k)
+  item_recommendation(casos[[k]], n = 5) %>%
+    transmute(caso = k, producto_consultado = nom[casos[[k]]],
+              recomendado = nombre, similitud, comunes)))
+tabla_casos
+```
+
+### Sesgo de popularidad y coseno ajustado
+
+En la tabla anterior, Ginkgo Biloba, Vitamina E y Nistatina + óxido de zinc aparecen como "similares" de productos sin relación terapéutica (loratadina, omeprazol, metformina). La razón es estadística, no farmacéutica. Ginkgo lo compró el `r round(100 * mean(M_pref[, "300000712"] > 0))` % de los compradores, así que su vector apunta casi en la dirección de "todos los compradores" y forma un ángulo pequeño con **cualquier** producto. Es el sesgo de concentración que advierte el enunciado.
+
+**Corrección propuesta.** Se resta al coseno observado el coseno que se esperaría si los compradores de $i$ y de $j$ fueran **independientes**. Bajo independencia, $E[r_{\cdot i}\cdot r_{\cdot j}] \approx \frac{1}{N}\sum_u r_{ui}\sum_u r_{uj}$, así que
+
+$$\tilde s_{ij} = \max\!\left(0,\; \cos(\theta_{ij}) - \frac{\left(\sum_u r_{ui}\right)\left(\sum_u r_{uj}\right)}{N\,\|r_{\cdot i}\|\,\|r_{\cdot j}\|}\right)$$
+
+Así $\tilde s_{ij}$ mide cuánto **más** de lo esperado por azar comparten compradores los dos productos. Se sigue usando el coseno, solo que se descuenta su componente explicada por la popularidad. Como medida complementaria para el usuario final se calcula el **lift**, $\text{lift}_{ij} = \frac{c_{ij}\,N}{n_i\,n_j}$: cuántas veces más de lo esperado se compran juntos.
+
+```{r coseno-ajustado}
+sim_items_ajustada <- function(M) {
+  S <- sim_items(M)
+  N <- nrow(M); s <- colSums(M); nr <- sqrt(colSums(M^2)); nr[nr == 0] <- 1
+  E <- outer(s / nr, s / nr) / N
+  diag(E) <- 0
+  pmax(S - E, 0)
+}
+lift_items <- function(M) {
+  B <- (M > 0) * 1; n <- colSums(B); n[n == 0] <- 1
+  L <- crossprod(B) * nrow(M) / outer(n, n); diag(L) <- 0; L
+}
+S_adj <- sim_items_ajustada(M_pref)
+
+tabla_casos_adj <- bind_rows(lapply(names(casos), function(k)
+  item_recommendation(casos[[k]], S = S_adj, n = 5) %>%
+    transmute(caso = k, producto_consultado = nom[casos[[k]]],
+              recomendado = nombre, similitud_ajustada = similitud, comunes)))
+tabla_casos_adj
+```
+
+```{r comparar-popularidad}
+populares <- productos$Material[1:5]
+bind_rows(
+  tabla_casos %>% summarise(variante = "Coseno",
+    `Recomendaciones que son un top-5 en ventas (%)` = round(100 * mean(recomendado %in% nom[populares]))),
+  tabla_casos_adj %>% summarise(variante = "Coseno ajustado",
+    `Recomendaciones que son un top-5 en ventas (%)` = round(100 * mean(recomendado %in% nom[populares]))))
+```
+
+**Lectura farmacéutica de los casos (coseno ajustado):**
+
+| Caso | Qué recomienda | ¿Tiene sentido? |
+|---|---|---|
+| Clotrimazol crema vaginal | Clotrimazol tópico y clotrimazol vaginal al 2 % | **Sí.** Es el mismo principio activo en otras presentaciones: sustitutos o complementos en el manejo de una candidiasis |
+| Loratadina 10 mg × 10 | Loratadina × 250 y loratadina jarabe; luego analgésicos (naproxeno) | **Sí.** El mismo antihistamínico en presentación grande y pediátrica. Los analgésicos reflejan un "botiquín de síntomas" |
+| Metformina 850 mg | G.MET 850 mg; tiras Glucoquick, lancetas y glucómetro | **Sí, muy claro.** Otra presentación comercial de la misma concentración, y los insumos de control glucémico que usa un paciente diabético |
+| Lagrifresh | Tearsoft y Lagrigen | **Sí.** Son otras lubricantes oftálmicas (lágrimas artificiales): sustitutos directos |
+| Novamil Premium 1 (400 g) | Novamil 1 de 800 g, Novamil 2 y 3; Nistatina + óxido de zinc | **Sí.** El mismo producto en otra presentación, la fórmula de la etapa siguiente y la crema para la zona del pañal: el perfil de un hogar con bebé |
+| Nistatina + óxido de zinc | Clotrimazol tópico, jarabes y gotas pediátricas (Fortzink, Dolofen, Klear Kids, Pediavit) | **Sí, por perfil.** Agrupa productos de cuidado infantil |
+| Omeprazol 20 mg | Trimebutina (antiespasmódico digestivo) junto a productos sin relación | **Parcial.** La trimebutina es un complemento terapéutico razonable; el resto refleja un comprador "de botiquín" |
+| Ginkgo Biloba | Otros productos masivos | **No es informativo.** Lo compra la mitad de los compradores, así que no tiene un patrón de compra distintivo. Es una limitación del método, no un error |
+
+**Conclusión de la fase 5.** El coseno sin ajustar responde la pregunta "¿qué compra todo el mundo?". El `r tabla_casos %>% summarise(round(100 * mean(recomendado %in% nom[populares]))) %>% pull()` % de sus recomendaciones en estos casos son productos del top-5 en ventas. El coseno ajustado responde "¿qué se compra junto con *este* producto más de lo esperable?" y baja esa proporción al `r tabla_casos_adj %>% summarise(round(100 * mean(recomendado %in% nom[populares]))) %>% pull()` %. Por eso **la vista «producto» del prototipo usa el coseno ajustado**. En la fase 7 se evalúan las dos variantes.
+
+## Fase 6. Recomendador usuario–usuario
+
+Dado un comprador $u$:
+
+1. se calcula el coseno entre su fila y la de todos los demás compradores;
+2. se toman sus $k$ vecinos más parecidos (con similitud positiva);
+3. a cada producto que **no** ha comprado se le asigna el puntaje $\text{score}_{ui} = \sum_{v \in N_k(u)} \text{sim}(u,v)\, r_{vi}$;
+4. se exige que al menos `umbral` vecinos lo hayan comprado;
+5. se recomiendan los $n$ de mayor puntaje.
+
+**[CAMBIO frente al tutorial].** El tutorial ordenaba por la calificación promedio de los vecinos. Con preferencias implícitas, un promedio simple trata igual al vecino más parecido y al menos parecido. Aquí cada vecino **pondera por su similitud**, que es el estimador estándar del k-NN colaborativo.
+
+```{r user-rec}
+Mu_pref <- normalizar_filas(M_pref)
+
+user_recommendation <- function(colaborador, M = M_pref, Mu = Mu_pref, n = 10, k = 20,
+                                umbral = 2) {
+  stopifnot(colaborador %in% rownames(M))
+  sims <- as.vector(Mu %*% Mu[colaborador, ]); names(sims) <- rownames(M)
+  sims[colaborador] <- 0
+  vecinos <- head(sort(sims[sims > 0], decreasing = TRUE), k)
+
+  ya_compro <- M[colaborador, ] > 0
+  score <- as.vector(vecinos %*% M[names(vecinos), , drop = FALSE])
+  n_vec <- colSums(M[names(vecinos), , drop = FALSE] > 0)
+
+  tibble(Material = colnames(M), score = score, vecinos_que_compran = n_vec) %>%
+    filter(!ya_compro, vecinos_que_compran >= umbral, score > 0) %>%
+    slice_max(score, n = n, with_ties = FALSE) %>%
+    left_join(productos %>% select(Material, nombre, forma), by = "Material") %>%
+    mutate(score = round(score, 3),
+           explicacion = paste0(vecinos_que_compran, " de tus ", length(vecinos),
+                                " compradores más parecidos lo compran"))
+}
+```
+
+El ejemplo usa $k$ = 20 de forma ilustrativa; el valor definitivo de $k$ se elige en la fase 7.
+
+### Comprobación: ¿se excluyen de verdad los productos ya comprados?
+
+```{r caso-usuario}
+# Comprador con un historial mediano (cerca de 22 productos distintos)
+n_prod <- rowSums(M_pref > 0)
+caso_u <- names(n_prod)[which.min(abs(n_prod - 22))]
+
+historial <- agg_total %>% filter(colaborador == caso_u) %>%
+  left_join(productos %>% select(Material, nombre), by = "Material") %>%
+  arrange(desc(unidades)) %>% select(Material, nombre, unidades, facturas)
+recs_u <- user_recommendation(caso_u)
+
+cat("Comprador:", caso_u, "| productos distintos en su historial:", nrow(historial), "\n")
+historial
+recs_u
+interseccion <- intersect(recs_u$Material, historial$Material)
+cat("Productos recomendados que ya había comprado:", length(interseccion), "\n")
+stopifnot(length(interseccion) == 0)
+```
+
+El `stopifnot()` detiene la ejecución si algún producto recomendado aparece en el historial. Como el documento se renderiza completo, la exclusión queda verificada.
+
+# Fase 7. Evaluación contra la línea base
+
+## Diseño
+
+- **Entrenamiento:** compras hasta el 31/12/2020. **Prueba:** compras del 01/01/2021 al 25/03/2022.
+- **Compradores evaluados:** los que compran en ambos periodos y tienen al menos una **compra nueva**.
+- **Compra nueva:** producto comprado en la prueba que el comprador **no** había comprado en el entrenamiento. Es coherente con que el recomendador excluya lo ya comprado: lo que se mide es si descubre productos nuevos para el comprador.
+- **Métricas por comprador**, con $R_u$ = las 10 recomendaciones y $T_u$ = sus compras nuevas:
+  - $\text{hit}_u@10 = \mathbb{1}[\,|R_u \cap T_u| \ge 1\,]$
+  - $\text{precision}_u@10 = |R_u \cap T_u| / 10$
+- **Línea base:** los 10 productos más vendidos (en unidades) del entrenamiento, **excluyendo los que el comprador ya compró**. Recomendar algo que ya tiene sería siempre un fallo bajo esta definición, así que excluirlos hace la línea base más exigente y la comparación más justa. Como referencia se reporta también la versión sin exclusión.
+- **Selección de hiperparámetros sin tocar la prueba:** la definición de preferencia, $k$, `umbral` y `min_comunes` se eligen con una partición de **validación** dentro del entrenamiento (entrenar hasta 2019, validar con 2020). Solo la configuración elegida se evalúa una vez en 2021–2022.
+
+## Validación de hiperparámetros (entrenar hasta 2019, validar con 2020)
+
+Se usa la misma partición de validación de la fase 3 (`PV`), con la definición de preferencia ya elegida.
+
+### Sensibilidad del usuario–usuario a k y al umbral
+
+```{r sens-k, fig.height = 4}
+grid_ku <- expand.grid(k = c(5, 10, 20, 50, 100, 200), umbral = c(1, 2, 3))
+sens <- bind_rows(lapply(seq_len(nrow(grid_ku)), function(i) {
+  g <- grid_ku[i, ]
+  metricas(recs_usuario(PV, pref_elegida, k = g$k, umbral = g$umbral), PV, "UU") %>%
+    summarise(hit_rate = mean(hit), precision = mean(precision),
+              recs_promedio = mean(n_recs)) %>%
+    mutate(k = g$k, umbral = g$umbral)
+}))
+sens %>% arrange(desc(hit_rate))
+
+ggplot(sens, aes(k, hit_rate, color = factor(umbral))) + geom_line() + geom_point() +
+  scale_x_log10(breaks = c(5, 10, 20, 50, 100, 200)) +
+  scale_color_manual(values = c("#0F5257", "#E4572E", "#8AA29E")) +
+  labs(title = "Sensibilidad del usuario–usuario (validación 2020)",
+       x = "k vecinos (escala log)", y = "Hit rate@10", color = "Umbral")
+
+mejor_uu <- sens %>% slice_max(hit_rate, n = 1, with_ties = FALSE)
+k_elegido <- mejor_uu$k; umbral_elegido <- mejor_uu$umbral
+c(k = k_elegido, umbral = umbral_elegido)
+```
+
+**Lectura de la sensibilidad.**
+
+- **Con pocos vecinos** ($k$ = 5 o 10), las recomendaciones son ruidosas e incompletas. Con umbral 3 y $k$ = 5, un comprador recibe en promedio `r num(sens$recs_promedio[sens$k == 5 & sens$umbral == 3], 1)` recomendaciones en lugar de 10, porque pocos productos los compran 3 de 5 vecinos.
+- **El desempeño sube hasta $k$ = `r k_elegido`** y baja en $k$ = 200. Con demasiados vecinos, el vecindario deja de ser "parecido" y el recomendador converge a la popularidad global. Es el compromiso clásico entre sesgo y varianza: pocos vecinos dan varianza alta y muchos dan un sesgo hacia lo popular.
+- **El umbral solo importa con $k$ pequeño.** Con $k \ge 50$, prácticamente todo candidato lo compran varios vecinos, y el filtro no elimina nada.
+- Configuración elegida: $k$ = `r k_elegido` y umbral = `r umbral_elegido`.
+
+### Soporte mínimo del ítem–ítem
+
+```{r sens-soporte}
+sens_c <- bind_rows(lapply(c(1, 3, 5, 10, 20, 50), function(mc) bind_rows(
+  metricas(recs_item(PV, pref_elegida, min_comunes = mc), PV, "Coseno"),
+  metricas(recs_item(PV, pref_elegida, min_comunes = mc, ajustado = TRUE), PV, "Coseno ajustado")) %>%
+    group_by(modelo) %>%
+    summarise(hit_rate = mean(hit), precision = mean(precision), .groups = "drop") %>%
+    mutate(min_comunes = mc)))
+sens_c %>% pivot_wider(names_from = modelo, values_from = c(hit_rate, precision))
+# El coseno simple es casi insensible al soporte: sus vecinos son productos masivos con soporte enorme.
+# El ajustado mejora con más soporte, porque el filtro elimina asociaciones de nicho poco respaldadas.
+min_comunes_elegido <- sens_c %>% filter(modelo == "Coseno") %>%
+  slice_max(hit_rate, n = 1, with_ties = FALSE) %>% pull(min_comunes)
+min_comunes_adj <- sens_c %>% filter(modelo == "Coseno ajustado") %>%
+  slice_max(hit_rate, n = 1, with_ties = FALSE) %>% pull(min_comunes)
+c(coseno = min_comunes_elegido, coseno_ajustado = min_comunes_adj)
+```
+
+## Prueba final (entrenar hasta 2020, probar con 2021–2022)
+
+```{r prueba}
+PT <- partir(as.Date("2020-12-31"), as.Date("2021-01-01"), as.Date("2022-03-31"))
+cat("Compradores en ambos periodos:",
+    length(intersect(unique(PT$agg$colaborador),
+                     unique(compras$colaborador[compras$fecha >= as.Date("2021-01-01")]))),
+    "| con al menos una compra nueva (evaluados):", length(PT$usuarios), "\n")
+
+res_test <- bind_rows(
+  metricas(recs_popularidad(PT, excluir_comprados = FALSE), PT, "Más vendidos (sin excluir comprados)"),
+  metricas(recs_popularidad(PT), PT, "Línea base: más vendidos"),
+  metricas(recs_item(PT, pref_elegida, min_comunes = min_comunes_elegido), PT, "Ítem–ítem (coseno)"),
+  metricas(recs_item(PT, pref_elegida, min_comunes = min_comunes_adj, ajustado = TRUE), PT,
+           "Ítem–ítem (coseno ajustado)"),
+  metricas(recs_usuario(PT, pref_elegida, k = k_elegido, umbral = umbral_elegido), PT, "Usuario–usuario")
+)
+```
+
+### Intervalos de confianza
+
+- **Hit rate@10** es una proporción. Se usa el intervalo de **Wilson** (score), que `prop.test(..., correct = FALSE)` calcula. Se comporta mejor que el de Wald cuando $p$ está lejos de 0,5.
+- **Precision@10** es la media de una variable acotada por comprador. Con $n$ del orden de miles, el TLC justifica un intervalo $t$.
+
+```{r ic}
+ic_tabla <- res_test %>% group_by(modelo) %>%
+  summarise(n = n(), aciertos = sum(hit),
+            hit_rate = mean(hit),
+            hit_li = prop.test(sum(hit), n(), correct = FALSE)$conf.int[1],
+            hit_ls = prop.test(sum(hit), n(), correct = FALSE)$conf.int[2],
+            prec_li = t.test(precision)$conf.int[1],
+            prec_ls = t.test(precision)$conf.int[2],
+            precision = mean(precision),
+            .groups = "drop") %>%
+  arrange(hit_rate)
+
+ic_tabla %>% transmute(
+  Modelo = modelo, Compradores = n,
+  `Hit rate@10` = sprintf("%.1f %%", 100 * hit_rate),
+  `IC 95 % hit` = sprintf("[%.1f ; %.1f]", 100 * hit_li, 100 * hit_ls),
+  `Precision@10` = sprintf("%.3f", precision),
+  `IC 95 % precisión` = sprintf("[%.3f ; %.3f]", prec_li, prec_ls))
+```
+
+```{r graf-ic, fig.height = 4.5}
+ic_tabla %>% mutate(modelo = factor(modelo, levels = modelo)) %>%
+  ggplot(aes(hit_rate, modelo)) +
+  geom_errorbarh(aes(xmin = hit_li, xmax = hit_ls), height = 0.25, color = "#0F5257") +
+  geom_point(size = 3, color = "#E4572E") +
+  scale_x_continuous(labels = scales::label_percent()) +
+  labs(title = "Hit rate@10 en 2021–2022 con IC del 95 %", x = "Hit rate@10", y = NULL)
+```
+
+### ¿El recomendador supera significativamente a la línea base?
+
+Las métricas se miden **sobre los mismos compradores**, así que las muestras son **pareadas**. Usar pruebas para muestras independientes ignoraría esa correlación y sería incorrecto.
+
+- **Hit rate (McNemar).** $H_0: p_{\text{modelo}} = p_{\text{base}}$ frente a $H_1: p_{\text{modelo}} \ne p_{\text{base}}$. La prueba usa solo los pares discordantes (acierta uno y falla el otro).
+- **Precision@10 (t pareada).** $H_0: \mu_d = 0$ frente a $H_1: \mu_d > 0$, con $d_u = \text{prec}_u^{\text{modelo}} - \text{prec}_u^{\text{base}}$. Se acompaña de la prueba de Wilcoxon de rangos con signo, que no supone normalidad de $d_u$.
+- Regla de decisión: se rechaza $H_0$ si el **valor-p** $< \alpha = 0{,}05$.
+
+```{r pruebas}
+ancho <- res_test %>% select(modelo, colaborador, hit, precision) %>%
+  pivot_wider(names_from = modelo, values_from = c(hit, precision))
+
+comparar <- function(modelo) {
+  hm <- ancho[[paste0("hit_", modelo)]]; hb <- ancho[["hit_Línea base: más vendidos"]]
+  pm <- ancho[[paste0("precision_", modelo)]]; pb <- ancho[["precision_Línea base: más vendidos"]]
+  mc <- mcnemar.test(table(factor(hm, 0:1), factor(hb, 0:1)))
+  tt <- t.test(pm, pb, paired = TRUE, alternative = "greater")
+  tc <- t.test(pm, pb, paired = TRUE)
+  wx <- wilcox.test(pm, pb, paired = TRUE, alternative = "greater", exact = FALSE)
+  tibble(Modelo = modelo,
+         `Δ hit rate (p.p.)` = round(100 * (mean(hm) - mean(hb)), 1),
+         `Modelo acierta, base no` = sum(hm == 1 & hb == 0),
+         `Base acierta, modelo no` = sum(hm == 0 & hb == 1),
+         `Valor-p McNemar` = signif(mc$p.value, 3),
+         `Δ precision@10` = round(mean(pm - pb), 4),
+         `IC 95 % Δ precisión` = sprintf("[%.4f ; %.4f]", tc$conf.int[1], tc$conf.int[2]),
+         `Valor-p t pareada (unilateral)` = signif(tt$p.value, 3),
+         `Valor-p Wilcoxon (unilateral)` = signif(wx$p.value, 3))
+}
+pruebas <- bind_rows(comparar("Ítem–ítem (coseno)"), comparar("Ítem–ítem (coseno ajustado)"),
+                     comparar("Usuario–usuario"))
+t(pruebas)
+```
+
+### Cobertura del catálogo
+
+Un recomendador que acierta solo porque repite los productos más vendidos aporta poco. La **cobertura** es la proporción del catálogo que aparece al menos una vez en alguna lista de recomendación.
+
+```{r cobertura}
+cobertura <- function(recs) length(unique(unlist(recs))) / length(catalogo)
+tibble(
+  Modelo = c("Línea base: más vendidos", "Ítem–ítem (coseno)", "Ítem–ítem (coseno ajustado)",
+             "Usuario–usuario"),
+  `Cobertura del catálogo (%)` = round(100 * c(
+    cobertura(recs_popularidad(PT)),
+    cobertura(recs_item(PT, pref_elegida, min_comunes = min_comunes_elegido)),
+    cobertura(recs_item(PT, pref_elegida, min_comunes = min_comunes_adj, ajustado = TRUE)),
+    cobertura(recs_usuario(PT, pref_elegida, k = k_elegido, umbral = umbral_elegido))), 1))
+```
+
+## Conclusión de la evaluación
+
+```{r conclusion-datos, include = FALSE}
+g <- function(m, col) ic_tabla[[col]][ic_tabla$modelo == m]
+pr <- function(m, col) pruebas[[col]][pruebas$Modelo == m]
+```
+
+1. **El usuario–usuario es el mejor recomendador.** Su hit rate@10 es de `r pc(g("Usuario–usuario", "hit_rate"))` (IC 95 %: `r pc(g("Usuario–usuario", "hit_li"))` a `r pc(g("Usuario–usuario", "hit_ls"))`), frente a `r pc(g("Línea base: más vendidos", "hit_rate"))` de la línea base. La diferencia es significativa (McNemar, valor-p = `r pv(pr("Usuario–usuario", "Valor-p McNemar"))`) y la precision@10 también es mayor (t pareada unilateral, valor-p = `r pv(pr("Usuario–usuario", "Valor-p t pareada (unilateral)"))`). Se rechaza $H_0$: **el recomendador supera significativamente a la línea base.**
+2. **El ítem–ítem con coseno simple también la supera** (valor-p McNemar = `r pv(pr("Ítem–ítem (coseno)", "Valor-p McNemar"))`), aunque por menos margen.
+3. **El coseno ajustado no difiere significativamente de la línea base** en aciertos (valor-p McNemar = `r pv(pr("Ítem–ítem (coseno ajustado)", "Valor-p McNemar"))`; no se rechaza $H_0$). En cambio, es el que **más catálogo cubre**: iguala la precisión de "lo más vendido" recomendando una variedad mucho mayor de productos. Por eso se usa en la vista de producto, cuya meta es mostrar asociaciones con sentido, y no en la vista de comprador.
+4. **Tamaño del efecto.** La ganancia es significativa pero moderada (`r num(pr("Usuario–usuario", "Δ hit rate (p.p.)"), 1)` puntos porcentuales de hit rate). En un mercado tan concentrado, la lista de "lo más vendido que aún no tienes" ya es un predictor fuerte. El valor del recomendador está en que acierta más **y** personaliza más.
+5. **Excluir lo ya comprado es decisivo.** La lista de más vendidos sin excluir lo comprado solo acierta en el `r pc(g("Más vendidos (sin excluir comprados)", "hit_rate"))` de los casos, porque gasta posiciones en productos que el comprador ya tiene.
+
+# Bonificación — Recomendador de contenido e híbrido
+
+Siguiendo el tutorial, se describe cada producto con variables categóricas y se calcula la **distancia de Gower**. Las equivalencias con los libros son:
+
+| Libros | Farmacia | Peso |
+|---|---|---|
+| Autor | **Línea**: primera palabra de la descripción (GUMIVIT, VITAMINA, DOLOFEN…) | 2 |
+| Categoría | **Forma farmacéutica** (derivada) | 1 |
+| Editorial | **IVA** (0, 16 o 19 %) y **fórmula médica** (SI/NO) | 0,5 cada una |
+
+El IVA tiene sentido como variable de contenido en Colombia: los medicamentos suelen estar excluidos (0 %), mientras que suplementos, cosméticos y dispositivos se gravan.
+
+```{r contenido}
+linea <- function(d) toupper(sub("^([A-Za-zÁÉÍÓÚÑáéíóúñ0-9+.-]+).*$", "\\1", trimws(d)))
+feat <- productos %>% arrange(match(Material, catalogo)) %>%
+  transmute(linea = factor(linea(nombre)), forma = factor(forma),
+            iva = factor(iva), formula = factor(formula_medica))
+D_cont <- as.matrix(daisy(as.data.frame(feat), metric = "gower", weights = c(2, 1, 0.5, 0.5)))
+S_cont <- 1 - D_cont; diag(S_cont) <- 0
+dimnames(S_cont) <- list(catalogo, catalogo)
+
+# Ejemplo: productos más parecidos en contenido a la Vitamina E 1000 UI
+tibble(Material = catalogo, sim = S_cont["300000714", ]) %>%
+  slice_max(sim, n = 6, with_ties = FALSE) %>%
+  left_join(productos %>% select(Material, nombre, forma), by = "Material")
+```
+
+**Híbrido.** $S_{\text{híbrido}} = \alpha\, S_{\text{colaborativo}} + (1-\alpha)\, S_{\text{contenido}}$. Con $\alpha = 0$ es puramente de contenido y con $\alpha = 1$ es puramente colaborativo. $\alpha$ se elige en validación.
+
+```{r hibrido}
+sens_alfa <- bind_rows(lapply(c(0, 0.25, 0.5, 0.75, 0.9, 1), function(a)
+  metricas(recs_item(PV, pref_elegida, min_comunes = min_comunes_elegido,
+                     S_extra = S_cont, alfa = a), PV, "H") %>%
+    summarise(hit_rate = mean(hit), precision = mean(precision)) %>% mutate(alfa = a)))
+sens_alfa
+alfa_elegido <- sens_alfa$alfa[which.max(sens_alfa$hit_rate)]
+
+res_bonus <- bind_rows(
+  metricas(recs_item(PT, pref_elegida, min_comunes = min_comunes_elegido,
+                     S_extra = S_cont, alfa = 0), PT, "Contenido (Gower)"),
+  metricas(recs_item(PT, pref_elegida, min_comunes = min_comunes_elegido,
+                     S_extra = S_cont, alfa = alfa_elegido), PT,
+           paste0("Híbrido (α = ", alfa_elegido, ")")))
+resumen(bind_rows(res_bonus, res_test %>% filter(modelo %in% c("Ítem–ítem (coseno)", "Línea base: más vendidos")))) %>%
+  arrange(desc(hit_rate))
+```
+
+**Lectura.** El recomendador de contenido solo es débil para predecir compras nuevas: sus "parecidos" son otras presentaciones del mismo producto o de la misma línea, que el comprador rara vez compra además de la que ya tiene. El híbrido con $\alpha$ = `r num(alfa_elegido, 2)` queda prácticamente igual al ítem–ítem colaborativo. El contenido aporta poco a la predicción, pero mucho a la **experiencia**: en la vista de producto responde a "¿hay otra presentación de esto?". Por eso la aplicación lo muestra como un carrusel separado de **alternativas** (sustitutos), distinto del de "quienes compran esto también compran" (complementos).
+
+# Exportación al prototipo
+
+El prototipo **no recalcula nada**: muestra lo que se calculó aquí. Para que las recomendaciones de la aplicación reflejen todo el historial disponible, se recalculan con los datos completos (2013–2022) y la configuración elegida en validación:
+
+- **Vista «comprador»:** recomendador usuario–usuario, que fue el de mejor desempeño en la prueba, con $k$ = `r k_elegido` y umbral = `r umbral_elegido`.
+- **Vista «producto»:** ítem–ítem con **coseno ajustado por popularidad**, que es el que da asociaciones con sentido farmacéutico (fase 5). En la evaluación por comprador se eligió un soporte mínimo de `r min_comunes_adj` compradores en común, pero con ese valor una parte grande del catálogo quedaría sin ningún producto similar (ver la tabla siguiente). Para la vista se usa un mínimo de 5 compradores en común, y cada tarjeta muestra ese número para que el usuario vea cuánta evidencia respalda la sugerencia. Cuando un producto tiene pocos similares, la aplicación muestra además las **alternativas por contenido** (misma línea y forma farmacéutica, recomendador de la bonificación).
+
+```{r soporte-vista}
+min_comunes_vista <- 5
+M_tmp <- matriz_up(agg_total, pref_elegida); C_tmp <- comunes(M_tmp)
+tibble(`Mínimo de compradores en común` = c(min_comunes_adj, min_comunes_vista),
+       `Productos sin ningún similar (%)` = round(100 * c(
+         mean(rowSums(C_tmp >= min_comunes_adj) == 0),
+         mean(rowSums(C_tmp >= min_comunes_vista) == 0)), 1))
+rm(M_tmp, C_tmp)
+```
+
+```{r exportar}
+dir.create("../app/datos-r", recursive = TRUE, showWarnings = FALSE)
+
+M_full  <- matriz_up(agg_total, pref_elegida)
+S_full  <- sim_items_ajustada(M_full)   # vista «producto»: coseno ajustado por popularidad
+C_full  <- comunes(M_full)
+L_full  <- lift_items(M_full)
+S_ok    <- S_full * (C_full >= min_comunes_vista)
+Mu_full <- normalizar_filas(M_full)
+B_full  <- M_full > 0
+
+# Productos con sus similares
+prod_json <- productos %>% arrange(desc(unidades)) %>%
+  rowwise() %>%
+  mutate(similares = list({
+    s <- S_ok[Material, ]; o <- order(s, decreasing = TRUE)[1:12]; o <- o[s[o] > 0]
+    data.frame(id = catalogo[o], s = round(s[o], 3), c = as.integer(C_full[Material, o]),
+               l = round(L_full[Material, o], 1))
+  }),
+  alternativas = list({
+    s <- S_cont[Material, ]; o <- order(s, decreasing = TRUE)[1:6]; o <- o[s[o] >= 0.6]
+    data.frame(id = catalogo[o], s = round(s[o], 3))
+  })) %>% ungroup() %>%
+  transmute(id = Material, nombre, forma, linea = linea(nombre), iva, formula = formula_medica,
+            unidades = as.integer(unidades), compradores = as.integer(compradores),
+            precio = as.integer(round(precio_mediano)), similares, alternativas)
+
+# Compradores: historial y recomendaciones usuario–usuario
+info_u <- compras %>% group_by(colaborador) %>%
+  summarise(facturas = n_distinct(invoice), desde = min(fecha), hasta = max(fecha),
+            unidades = sum(cantidad))
+SIMU <- tcrossprod(Mu_full)
+diag(SIMU) <- 0
+
+comp_json <- lapply(seq_len(nrow(M_full)), function(i) {
+  u <- rownames(M_full)[i]; s <- SIMU[i, ]
+  nb <- head(order(s, decreasing = TRUE), k_elegido); nb <- nb[s[nb] > 0]
+  score <- as.vector(s[nb] %*% M_full[nb, , drop = FALSE])
+  cnt <- colSums(B_full[nb, , drop = FALSE])
+  score[cnt < umbral_elegido] <- 0
+  top <- top_validos(score, B_full[i, ], 12)
+  hist_idx <- which(B_full[i, ])
+  # Para explicar: el producto del historial más parecido a cada recomendación
+  porque <- vapply(top, function(j) {
+    h <- hist_idx[which.max(S_full[hist_idx, j])]
+    if (length(h) && S_full[h, j] > 0) catalogo[h] else NA_character_ }, "")
+  h <- agg_total %>% filter(colaborador == u) %>% arrange(desc(unidades))
+  list(id = u, facturas = info_u$facturas[info_u$colaborador == u],
+       desde = format(info_u$desde[info_u$colaborador == u]),
+       hasta = format(info_u$hasta[info_u$colaborador == u]),
+       vecinos = length(nb),
+       historial = data.frame(id = h$Material, u = as.integer(h$unidades), f = h$facturas),
+       recs = data.frame(id = catalogo[top], s = round(score[top], 3),
+                         v = as.integer(cnt[top]), p = porque))
+})
+
+# Verificación final: ninguna recomendación exportada está en el historial del comprador
+stopifnot(all(vapply(comp_json, function(x) !any(x$recs$id %in% x$historial$id), TRUE)))
+
+metr_json <- list(
+  configuracion = list(preferencia = pref_elegida, k = k_elegido, umbral = umbral_elegido,
+                       min_comunes = min_comunes_elegido, min_comunes_ajustado = min_comunes_adj,
+                       min_comunes_vista = min_comunes_vista,
+                       alfa_hibrido = alfa_elegido),
+  datos = list(lineas = nrow(compras), facturas = n_distinct(compras$invoice),
+               compradores = nrow(M_full), productos = ncol(M_full),
+               dispersion = round(dispersion, 4),
+               desde = format(min(compras$fecha)), hasta = format(max(compras$fecha))),
+  evaluacion = ic_tabla, pruebas = pruebas,
+  usuarios_evaluados = length(PT$usuarios))
+
+write_json(prod_json, "../app/datos-r/productos.json", dataframe = "rows", auto_unbox = TRUE, na = "null")
+write_json(comp_json, "../app/datos-r/compradores.json", dataframe = "rows", auto_unbox = TRUE, na = "null")
+write_json(metr_json, "../app/datos-r/metricas.json", dataframe = "rows", auto_unbox = TRUE, digits = 4)
+
+file.info(list.files("../app/datos-r", full.names = TRUE))[, "size", drop = FALSE]
+```
+
+# Limitaciones
+
+1. **La preferencia es implícita.** No comprar no equivale a que no guste: el producto pudo estar agotado, no exhibirse o no necesitarse en ese momento. Las métricas penalizan como "fallo" recomendaciones que quizá eran pertinentes.
+2. **La demanda está concentrada.** Unos pocos productos dominan las compras. Eso hace exigente la línea base y explica que la ventaja del recomendador sea moderada. Los productos masivos (p. ej., Ginkgo Biloba) no tienen vecinos informativos.
+3. **El mismo producto aparece con varios códigos.** Promociones, empaques navideños y "pague 1 lleve 2" tienen códigos `Material` distintos. Eso divide la señal y puede hacer que se recomiende otra presentación del producto que el comprador ya tiene. Consolidarlos exigiría un catálogo maestro que los datos no traen.
+4. **La forma farmacéutica es derivada.** Se obtuvo con reglas de texto sobre `description` y puede tener errores puntuales (`r sum(productos$forma == "Otro")` producto(s) quedan como "Otro").
+5. **El periodo de prueba no es estacionario.** 2021–2022 incluye productos ligados a la pandemia (tapabocas, pruebas COVID). Las métricas de prueba pueden no representar un periodo normal.
+6. **Población evaluada.** Solo se evalúan compradores presentes en ambos periodos con al menos una compra nueva (`r length(PT$usuarios)`). El arranque en frío (compradores nuevos sin historial) no se evalúa.
+7. **Población de compradores.** El campo se llama `colaborador` y las facturas admiten cuotas, lo que sugiere una tienda para colaboradores de la empresa. Los datos no permiten confirmarlo. Si es así, los resultados no se generalizan sin más al público general.
+8. **Soporte en la vista de producto.** La vista usa un mínimo de 5 compradores en común, menor que el elegido en la evaluación por comprador, para no dejar productos sin similares. Esas asociaciones tienen menos respaldo, y por eso la tarjeta muestra siempre el número de compradores en común.
+
+```{r tiempo, echo = FALSE}
+cat("Tiempo total de ejecución:", round(difftime(Sys.time(), t_inicio, units = "mins"), 1), "minutos\n")
+sessionInfo()$R.version$version.string
+```
