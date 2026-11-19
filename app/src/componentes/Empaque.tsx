@@ -21,16 +21,19 @@ function tono(linea: string) {
 
 // Parte el nombre en líneas que caben en la etiqueta
 function lineas(texto: string, max: number, n: number) {
-  const palabras = texto.split(" ");
+  // "+" también es punto de corte, y una palabra más larga que la etiqueta se recorta
+  const palabras = texto.replace(/\+/g, "+ ").split(" ").filter(Boolean)
+    .map((w) => (w.length > max ? w.slice(0, max - 1) + "…" : w));
   const out: string[] = [];
   let actual = "";
   for (const p of palabras) {
-    if ((actual + " " + p).trim().length <= max) actual = (actual + " " + p).trim();
+    const junto = actual.endsWith("+") ? actual + p : (actual + " " + p).trim();
+    if (junto.length <= max) actual = junto;
     else { if (actual) out.push(actual); actual = p; }
     if (out.length === n) break;
   }
   if (out.length < n && actual) out.push(actual);
-  if (out.length === n && palabras.join(" ").length > out.join(" ").length) {
+  if (out.length === n && palabras.join("").length > out.join("").replace(/ /g, "").length) {
     out[n - 1] = out[n - 1].length > max - 1 ? out[n - 1].slice(0, max - 1) + "…" : out[n - 1] + "…";
   }
   return out.slice(0, n);
@@ -40,7 +43,9 @@ interface Props { p: Producto; tam?: number; className?: string }
 
 function EmpaqueSvg({ p, tam = 160, className }: Props) {
   const t = tono(p.li);
-  const nombre = lineas(p.n, p.e === "gotero" || p.e === "spray" ? 11 : 14, 2);
+  const angosto = p.e === "gotero" || p.e === "spray" || p.e === "tubo" || p.e === "botella";
+  const nombre = lineas(p.n, angosto ? 10 : 14, 2);
+  const letra = angosto ? 9 : 10;
   const etiqueta = (x: number, y: number, ancho: number, alto: number, centro = true) => {
     const cx = x + ancho / 2;
     return (
@@ -49,7 +54,7 @@ function EmpaqueSvg({ p, tam = 160, className }: Props) {
         <rect x={x} y={y} width={ancho} height={5} rx={2} fill={t.base} />
         {nombre.map((l, i) => (
           <text key={i} x={centro ? cx : x + 6} y={y + 17 + i * 11.5} textAnchor={centro ? "middle" : "start"}
-            fontSize={10} fontWeight={700} fill="#16302D" fontFamily="'Atkinson Hyperlegible', sans-serif">{l}</text>
+            fontSize={letra} fontWeight={700} fill="#16302D" fontFamily="'Atkinson Hyperlegible', sans-serif">{l}</text>
         ))}
         <rect x={centro ? cx - 14 : x + 6} y={y + alto - 9} width={28} height={3} rx={1.5} fill={t.base} opacity={0.5} />
       </g>
