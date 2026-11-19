@@ -1,0 +1,378 @@
+---
+title: "Rbooks"
+author: "Universidad del Magdalena"
+date: "2026-11-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+```
+
+## Data reading
+
+
+```{r cars}
+unzip("archive.zip",exdir = "data")   
+
+files = paste0("data/",list.files("data"))
+
+books = read.csv(files[1], sep = ";")
+ratings = read.csv(files[2], sep = ";")
+users = read.csv(files[3], sep = ";")
+
+rm(files)
+```
+
+## Data exploration
+
+You can also embed plots, for example:
+
+```{r}
+glimpse(ratings)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Creating random categories
+
+```{r}
+set.seed(1234)
+categories = c("Action and Adventure","Classic","Detective and Mystery","Fantasy")
+books$category = sample( categories, nrow(books), replace=TRUE, prob=c(0.25, 0.3, 0.25, 0.20))
+books$category = as.factor(books$category)
+
+rm(categories)
+
+```
+
+
+# ID Format
+
+```{r}
+books$ISBN = paste0("Isbn.",books$ISBN)
+users$User.ID = paste0("User.",users$User.ID)
+ratings$ISBN = paste0("Isbn.",ratings$ISBN)
+ratings$User.ID = paste0("User.",ratings$User.ID)
+
+```
+
+
+## Exploring ratings
+```{r}
+library(ggplot2)
+
+ratings %>%
+  group_by(Rating) %>%
+  summarize(cases = n()) %>%
+  ggplot(aes(Rating, cases)) + geom_col() +
+  theme_minimal() + scale_x_continuous(breaks = 0:10) 
+
+```
+
+## What about the zeros?
+
+
+```{r}
+ratings = ratings[ratings$Rating!= 0, ]
+
+```
+
+
+## The same graph but with no zeros
+
+```{r}
+ratings %>%
+  group_by(Rating) %>%
+  summarize(cases = n()) %>%
+  ggplot(aes(Rating, cases)) + geom_col() +
+  theme_minimal() + scale_x_continuous(breaks = 0:10)
+
+```
+
+## What about ratings
+
+```{r}
+ratings_sum = ratings %>%
+  group_by(User.ID) %>%
+  count() 
+
+summary(ratings_sum$n)
+
+```
+
+Como vemos, el 75% de los usuarios ha dado 3 recomendaciones o menos. Vamos a quitar estas personas para quedarnos únicamente con usuarios más significativos y que, así, las necesidades de computación sean menores:
+
+```{r}
+user_index = ratings_sum$User.ID[ratings_sum$n>4]
+
+users = users[users$User.ID %in% user_index, ]
+ratings = ratings[ratings$User.ID %in% user_index, ]
+books = books[books$ISBN %in% ratings$ISBN,]
+
+rm(ratings_sum, user_index)
+```
+
+
+
+## Let's start with our Recommender System
+
+## Disimilitud
+
+Por tanto, nos quedamos con las variables Autor, Editorial y Categoría. Pero… ¿cómo podemos saber cómo de similares son dos productos en base a unas categorías? Para eso, tenemos que calcular distancias.
+
+La forma de distancia que podamos calcular dependerá en gran medida de los tipos de datos que tengamos. Básicamente, existen tres opciones:
+
+Todos los datos son numéricos: en este caso podríamos normalizar los datos y usar la distancia Euclidea para calcular las distancias. Esto es algo que vimos cuando programamos el algoritmo K-means desde 0 en R.
+Tienes datos numéricos y categóricos. En este caso deberás usar la distancia de Gower. Esta la podrás encontrar en la función daisy del paquete cluster (enlace).
+Todos los datos son categóricos: existen distintas formas de calcular distancias en estos casos. Sin embargo, según este estudio, no existe gran diferencias entre todas ellas, por lo que podrías usar cualquier tipo de medición común.
+
+
+```{r}
+library(cluster)
+
+books_distance = books[,c("ISBN","Author","Publisher")] 
+
+# Convierto a factores
+books_distance[,1] <- as.factor(books_distance[,1])
+books_distance[,2] <- as.factor(books_distance[,2])
+books_distance[,3] <- as.factor(books_distance[,3])
+
+dissimilarity = daisy(books_distance, metric = "gower")
+
+```
+```{r}
+matrix(ncol = 115246, nrow = 115246)
+
+```
+
+Para evitar este problema, vamos a quedarnos únicamente con 10.000 libros de los autores más comunes para ver cómo funcionan. Además, vamos a dar un peso a cada variable, de tal forma que dos libros se parezcan más por ser de la misma autora que por ser de la misma editorial.
+
+```{r}
+library(dplyr)
+
+book_feature = books[1:10000,c("Author","Publisher","category")] 
+
+# Convierto a factores
+book_feature[,1] <- as.factor(book_feature[,1])
+book_feature[,2] <- as.factor(book_feature[,2])
+book_feature[,3] <- as.factor(book_feature[,3])
+
+dissimilarity = daisy(book_feature, metric = "gower", weights = c(2,0.5,1))
+dissimilarity = as.matrix(dissimilarity)
+
+row.names(dissimilarity)<-  books$ISBN[1:10000]
+colnames(dissimilarity)<- books$ISBN[1:10000]
+
+dissimilarity[15:20,15:20]
+
+```
+
+Como veis, la matriz tiene sobre todo dos valores: 0 y el 1, siendo 0 el menor grado de disimilitud y el 1 el máximo grado. Ojo, estamos hablando de disimilitud, por lo que, si que si el valor es 0, significa que esos libros son iguales, mientras que si es 1, no tienen nada en común.
+
+Como vemos, de todos los libros que hemos sacado, vemos que hay libros que tienen cosas en común: 0684823802 se parece a 0345402871 y 0345402871 se parece a 0345417623. Veamos a ver por qué se da esa similitud:
+
+Y es que, de hecho, las reglas de recomendación de este algoritmo se basan en recomendar libros que sean:
+
+Del mismo autor, editorial y categoría.
+Del mismo autor y categoría.
+Que sean solo del mismo autor.
+De la misma categoría y editorial.
+Que solo sean de la misma categoría.
+Que solo sean de la misma editorial.
+Ahora que ya tenemos la distancia entre libros y sabemos cómo funciona este sistema de recomendación…. ¡vamos a ver qué libro recomendamos a un usuario!
+
+
+Para obtener las recomendaciones para un usuario, vamos a necesitar los libros que un usuario ha leído y valorado. De esta forma, podremos buscar los libros que se parezcan a esos libros. Además, hay que tener en cuenta que no contamos con todos los libros, sino con solo una muestra de ellos, ya que nos hemos quedado con los 10.000 autores más famosos.
+
+En cualquier caso, vamos a elegir un usuario y quedarnos con los libros que ha leído sobre los que podemos aplicar el algoritmo:
+
+```{r}
+user_id = "User.1167"
+
+user_books = ratings %>%
+  filter(User.ID == user_id & ISBN %in% books$ISBN[1:10000]) %>%
+  arrange(desc(Rating))
+
+head(user_books,10)
+
+```
+
+
+Como vemos, el usuario ha dado 6 recomendaciones dando puntuaciones de 10, 9, 8, 7 y 5 puntos. Utilizar las recomendaciones es algo importante, ya que nos permite ponderar las recomendaciones que damos: priorizaremos un libro similar al que ha puntuado con un 10 que a uno que ha puntuado con un 5. Además, dejaremos de recomendar aquellos libros que se parezcan a los que ha puntuado con un 0.
+
+Teniendo esto en cuenta vamos a encontrar los libros que más se parecen a estos dos ejemplares:
+
+```{r}
+library(tidyr)
+
+books$ISBN = as.character(books$ISBN)
+selected_books = user_books[ ,c("ISBN", "Rating")]
+
+recomendar = function(selected_books, dissimilarity_matrix, 
+                      books, n_recommendations = 5){
+
+  selected_book_indexes = which(colnames(dissimilarity_matrix) %in% selected_books$ISBN)
+
+
+  results = data.frame(dissimilarity_matrix[, selected_book_indexes], 
+                       recommended_book = row.names(dissimilarity_matrix),
+                       stringsAsFactors = FALSE) 
+
+
+  recomendaciones = results %>%
+    pivot_longer(cols = c(-"recommended_book") , names_to = "readed_book", 
+                 values_to = "dissimilarity") %>%
+      left_join(selected_books, by = c("recommended_book" = "ISBN"))%>%
+    arrange(desc(dissimilarity)) %>%
+    filter(recommended_book != readed_book) %>%
+    filter(!is.na(Rating) ) %>%
+    mutate(
+      similarity = 1 - dissimilarity,
+      weighted_score = similarity * Rating) %>%
+    arrange(desc(weighted_score)) %>%
+    filter(weighted_score>0) %>%
+    group_by(recommended_book) %>% slice(1) %>%
+    top_n(n_recommendations, weighted_score)  %>%
+    left_join(books, by = c("recommended_book" = "ISBN"))
+
+  return(recomendaciones)
+}
+
+recomendaciones = recomendar(selected_books, dissimilarity, books)
+recomendaciones
+
+```
+
+
+Y con esto… ¡Ya hemos creado nuestro sistema de recomendación basado en contenido! Como ves, al usuario le recomendamos varios libros similares por haber leído el libro 0060929596.
+
+Vamos a crear una función que nos permita visualizarlo de una forma más fácil:
+
+
+
+## Programar sistema de recomendación colaborativo basado en productos en R
+
+Para programar un sistema de recomendación colaborativo basado en contenido, primero tenemos que crear la matriz Usuario-Producto. Esto lo podemos hacer de forma sencilla con la función pivot_widerde tidyr.
+
+```{r}
+user_item = ratings %>%
+  top_n(10000) %>%
+  pivot_wider(names_from = ISBN,values_from = Rating) %>%
+  as.data.frame()
+
+row.names(user_item) = user_item$User.ID
+user_item$User.ID = NULL
+
+user_item = as.matrix(user_item)
+
+user_item[1:5,1:5]
+
+```
+Sin embargo, vemos como esto tienen un problema: hay mucho NA. Si lo piensas es algo normal, ya que un usuario solo leerá unos pocos libros de todos los que están disponibles.
+
+En cualquier caso, al hecho de tener muchos NAs se le denomina sparsity o matriz dispersa. Podemos calcular el grado de sparsity de la siguiente manera:
+
+```{r}
+sum(is.na(user_item)) /  ( ncol(user_item) * nrow(user_item) )
+
+```
+
+Como puedes ver tenemos una matriz muy muy dispersa, ya que en el 99,96% de las celdas faltan datos. Esto es algo que nos limita bastante de cara a poder actuar, ya que a partir de esta matriz debemos encontrar la similitud entre productos.
+
+Para ello, existen distintas fórmulas: similitud de coseno, coeficiente de correlación de Pearson, distancia Euclídea… En nuestro caso usaremos la similitud de coseno.
+
+```{r}
+cos_similarity = function(A,B){
+  num = sum(A *B, na.rm = T)
+  den = sqrt(sum(A^2, na.rm = T)) * sqrt(sum(B^2, na.rm = T)) 
+  result = num/den
+
+  return(result)
+}
+
+```
+
+
+
+Ahora que tenemos programada la función de coseno, podemos aplicar esta función para todos los items y así obtener la matriz Producto-Producto.
+
+Sin embargo, no es algo que vayamos a aplicar a todos los items, sino únicamente al item del cual queremos encontrar productos similares. Y es que, una vez más, calcular la matriz item-item es computacionalmente muy exigente y requeriría de mucho tiempo y memoria.
+
+En cualquier caso, creamos una función para calcular la similitud únicamente sobre el id de producto que nosotros elijamos.
+
+```{r}
+item_recommendation = function(book_id, rating_matrix = user_item, n_recommendations = 5){
+
+  user_index = which(rownames(rating_matrix) == book_id)
+
+  similarity = apply(rating_matrix, 2, FUN = function(y) 
+                      cos_similarity(rating_matrix[user_index,], y))
+
+  recommendations = tibble(ISBN = names(similarity), 
+                               similarity = similarity) %>%
+    filter(ISBN != book_id) %>% 
+    top_n(n_recommendations, similarity) %>%
+    arrange(desc(similarity)) 
+
+  return(recommendations)
+
+}
+
+recom_cf_item = item_recommendation("Isbn.0446677451")
+recom_cf_item
+
+```
+
+
+## Programar sistema de recomendación colaborativo basado en usuarios en R
+
+
+Para programar un sistema de recomendación colaborativo basado en usuarios partiremos de la matriz Usario – Item. Solo que en este caso, en vez calcular las distancias a nivel de columna, lo haremos a nivel de fila.
+
+```{r}
+user_recommendation = function(user_id, user_item_matrix = user_item,
+                               ratings_matrix = ratings,
+                               n_recommendations = 5,
+                               threshold = 1,
+                               nearest_neighbors = 10){
+
+  user_index = which(rownames(user_item_matrix) == user_id)
+
+  similarity = apply(user_item_matrix, 1, FUN = function(y) 
+                      cos_similarity(user_item_matrix[user_index,], y))
+
+  similar_users = tibble(User.ID = names(similarity), 
+                               similarity = similarity) %>%
+    filter(User.ID != user_id) %>% 
+    arrange(desc(similarity)) %>%
+    top_n(nearest_neighbors, similarity)
+
+
+  readed_books_user = ratings_matrix$ISBN[ratings_matrix$User.ID == user_id]
+
+  recommendations = ratings_matrix %>%
+    filter(
+      User.ID %in% similar_users$User.ID &
+      !(ISBN %in% readed_books_user)) %>%
+    group_by(ISBN) %>%
+    summarise(
+      count = n(),
+      Rating = mean(Rating)
+    ) %>%
+    filter(count > threshold) %>%
+    arrange(desc(Rating), desc(count)) %>%
+    head(n_recommendations)
+
+  return(recommendations)
+
+}
+
+recom_cf_user = user_recommendation("User.99", n_recommendations = 20)
+recom_cf_user
+
+```
+
+
