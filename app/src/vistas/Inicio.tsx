@@ -112,7 +112,7 @@ export default function Inicio({ productos, categorias, canasta, abrirAsistente 
           <section className="tarjeta-lateral asistente-tarjeta">
             <div className="asistente-tarjeta__cabeza">
               <span className="robot"><Icono n="robot" tam={30} /></span>
-              <h2>Asistente Vitrina</h2>
+              <h2>Messi, tu asistente</h2>
             </div>
             <p>¿No sabes qué producto buscar? Cuéntame qué necesitas y te recomiendo opciones.</p>
             <button type="button" className="boton boton--ancho" onClick={abrirAsistente}>
@@ -188,7 +188,7 @@ export default function Inicio({ productos, categorias, canasta, abrirAsistente 
         </a>
         <button type="button" className="camino" onClick={abrirAsistente}>
           <span className="camino__icono" aria-hidden="true"><Icono n="robot" tam={28} /></span>
-          <span><strong>Pregúntale al asistente</strong><span>Dile qué necesitas y te ayuda a encontrarlo.</span></span>
+          <span><strong>Pregúntale a Messi</strong><span>Dile qué necesitas y te ayuda a encontrarlo.</span></span>
         </button>
       </section>
     </main>
