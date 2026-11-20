@@ -56,8 +56,8 @@ export default function Asistente({ abierto, setAbierto, productos, categorias, 
 
   if (!abierto) {
     return (
-      <button type="button" className="asistente-boton" onClick={() => setAbierto(true)} aria-label="Abrir el asistente virtual">
-        <Icono n="robot" tam={26} /><span>Asistente</span>
+      <button type="button" className="asistente-boton" onClick={() => setAbierto(true)} aria-label="Abrir a Messi, el asistente virtual">
+        <Icono n="robot" tam={26} /><span>Messi</span>
       </button>
     );
   }
@@ -67,10 +67,10 @@ export default function Asistente({ abierto, setAbierto, productos, categorias, 
       <header className="asistente__cabeza">
         <span className="robot robot--claro"><Icono n="robot" tam={26} /></span>
         <div>
-          <h2 id="asistente-titulo">Asistente Vitrina</h2>
-          <p>Te ayudo a encontrar productos</p>
+          <h2 id="asistente-titulo">Messi</h2>
+          <p>Tu asistente en Vitrina</p>
         </div>
-        <button type="button" className="asistente__cerrar" onClick={() => setAbierto(false)} aria-label="Cerrar el asistente">
+        <button type="button" className="asistente__cerrar" onClick={() => setAbierto(false)} aria-label="Cerrar a Messi">
           <Icono n="cerrar" tam={20} />
         </button>
       </header>
@@ -118,7 +118,7 @@ export default function Asistente({ abierto, setAbierto, productos, categorias, 
             )}
           </div>
         ))}
-        {pensando && <p className="burbuja burbuja--pensando" aria-label="El asistente está escribiendo"><span /><span /><span /></p>}
+        {pensando && <p className="burbuja burbuja--pensando" aria-label="Messi está escribiendo"><span /><span /><span /></p>}
       </div>
 
       <form className="asistente__entrada" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>

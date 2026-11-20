@@ -106,12 +106,12 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
     return { aviso: true, texto: "Lo que sientes importa y no tienes que pasarlo solo. Si piensas en hacerte daño, busca ayuda ahora mismo: llama a la línea de emergencias **123** o acude a urgencias, y cuéntale a alguien de confianza." };
   }
   if (contiene(t, URGENCIA)) {
-    return { aviso: true, texto: "Eso puede ser una emergencia. Llama a la línea **123** o acude a urgencias de inmediato. Este asistente solo ayuda a encontrar productos y no reemplaza la atención médica." };
+    return { aviso: true, texto: "Eso puede ser una emergencia. Llama a la línea **123** o acude a urgencias de inmediato. Messi solo ayuda a encontrar productos y no reemplaza la atención médica." };
   }
 
   // 2. Saludo, ayuda y agradecimiento
   if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|ayuda|ayudame|menu|que puedes hacer|que haces)\b/.test(t)) {
-    return { texto: "¡Hola! Soy el asistente de Vitrina. Puedo buscar productos por nombre, sugerirte opciones según lo que necesitas, decirte qué se compra junto con un producto y completar tu canasta. ¿Por dónde empezamos?", sugerencias: SUGERENCIAS_INICIO };
+    return { texto: "¡Hola! Soy Messi, el asistente de Vitrina. Puedo buscar productos por nombre, sugerirte opciones según lo que necesitas, decirte qué se compra junto con un producto y completar tu canasta. ¿Por dónde empezamos?", sugerencias: SUGERENCIAS_INICIO };
   }
   if (/^(gracias|muchas gracias|listo|ok|perfecto|vale)\b/.test(t)) {
     return { texto: "¡Con gusto! Si necesitas algo más, aquí estoy.", sugerencias: ["Ver mi canasta", "Lo más comprado"] };
@@ -245,6 +245,6 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
 }
 
 export const MENSAJE_INICIAL: Respuesta = {
-  texto: "¡Hola! Soy el asistente de Vitrina. Cuéntame qué necesitas o qué producto buscas y te recomiendo opciones con base en lo que compran otras personas.",
+  texto: "¡Hola! Soy Messi, el asistente de Vitrina. Cuéntame qué necesitas o qué producto buscas y te recomiendo opciones con base en lo que compran otras personas.",
   sugerencias: SUGERENCIAS_INICIO,
 };
