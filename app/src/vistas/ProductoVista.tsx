@@ -3,10 +3,11 @@ import { miles } from "../datos";
 import { enlace } from "../ruta";
 import Empaque from "../componentes/Empaque";
 import Tarjeta from "../componentes/Tarjeta";
+import type { Canasta } from "../canasta";
 
-interface Props { productos: Producto[]; id: string }
+interface Props { productos: Producto[]; id: string; canasta: Canasta }
 
-export default function ProductoVista({ productos, id }: Props) {
+export default function ProductoVista({ productos, id, canasta }: Props) {
   const p = productos.find((x) => x.id === id);
   if (!p) {
     return (
@@ -47,7 +48,14 @@ export default function ProductoVista({ productos, id }: Props) {
             {p.u > p.c ? <> ({miles(p.u)} unidades en total)</> : null}.
           </p>
           <p className="ficha__factura">Nombre en la factura: {p.d}</p>
-          <a className="enlace-secundario" href={enlace.compradores(p.id)}>Ver compradores de este producto</a>
+          <div className="ficha__acciones">
+            {canasta.tiene(p.idx) ? (
+              <a className="boton boton--secundario" href={enlace.canasta()}>✓ En tu canasta: ver sugerencias</a>
+            ) : (
+              <button type="button" className="boton" onClick={() => canasta.agregar(p.idx)}>Agregar a la canasta</button>
+            )}
+            <a className="enlace-secundario" href={enlace.compradores(p.id)}>Ver compradores de este producto</a>
+          </div>
         </div>
       </section>
 
