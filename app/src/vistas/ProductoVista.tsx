@@ -1,13 +1,13 @@
-import type { Producto } from "../datos";
-import { miles } from "../datos";
+import type { Categoria, Producto } from "../datos";
+import { miles, pesos } from "../datos";
 import { enlace } from "../ruta";
 import Empaque from "../componentes/Empaque";
 import Tarjeta from "../componentes/Tarjeta";
 import type { Canasta } from "../canasta";
 
-interface Props { productos: Producto[]; id: string; canasta: Canasta }
+interface Props { productos: Producto[]; categorias: Categoria[]; id: string; canasta: Canasta }
 
-export default function ProductoVista({ productos, id, canasta }: Props) {
+export default function ProductoVista({ productos, categorias, id, canasta }: Props) {
   const p = productos.find((x) => x.id === id);
   if (!p) {
     return (
@@ -18,6 +18,7 @@ export default function ProductoVista({ productos, id, canasta }: Props) {
       </main>
     );
   }
+  const cat = categorias.find((c) => c.id === p.ca);
   const similares = p.s.map(([i, c, l]) => ({ q: productos[i], c, l }));
   const maxC = Math.max(1, ...similares.map((x) => x.l));
   const alternativas = p.a.map((i) => productos[i]).filter((x) => !similares.some((s) => s.q.idx === x.idx)).slice(0, 6);
@@ -30,7 +31,9 @@ export default function ProductoVista({ productos, id, canasta }: Props) {
   return (
     <main id="contenido">
       <nav className="migas" aria-label="Estás en">
-        <a href={enlace.inicio()}>Productos</a> <span aria-hidden="true">/</span> <span>{p.n}</span>
+        <a href={enlace.catalogo()}>Productos</a> <span aria-hidden="true">/</span>{" "}
+        {cat && <><a href={enlace.catalogo(cat.id)}>{cat.nombre}</a> <span aria-hidden="true">/</span>{" "}</>}
+        <span>{p.n}</span>
       </nav>
 
       <section className="ficha">
@@ -39,10 +42,14 @@ export default function ProductoVista({ productos, id, canasta }: Props) {
           <h1 className="ficha__nombre">{p.n}</h1>
           <p className="ficha__pres">{p.pr}</p>
           <ul className="chips" aria-label="Características">
+            {cat && <li><a href={enlace.catalogo(cat.id)}>{cat.nombre}</a></li>}
             <li>{p.fo}</li>
             {p.rx === 1 && <li className="chip--alerta">Requiere fórmula médica</li>}
             <li>{p.iva === 0 ? "Sin IVA" : `IVA ${p.iva} %`}</li>
           </ul>
+          {p.$ > 0 && (
+            <p className="ficha__precio">{pesos(p.$)} <small>precio de referencia (mediana pagada en las facturas)</small></p>
+          )}
           <p className="ficha__dato">
             Lo han comprado <strong>{miles(p.c)}</strong> {p.c === 1 ? "persona" : "personas"}
             {p.u > p.c ? <> ({miles(p.u)} unidades en total)</> : null}.

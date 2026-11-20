@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CATEGORIAS, categoria } from "./categorias.mjs";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
 const leer = (f) => JSON.parse(readFileSync(join(raiz, "datos-r", f), "utf8"));
@@ -116,6 +117,7 @@ const prodApp = productos.map((p) => ({
   pr: presentacion(p.nombre),
   d: p.nombre,
   fo: p.forma,
+  ca: categoria(p.nombre, p.forma),
   e: empaque(p.nombre, p.forma),
   li: p.linea,
   iva: p.iva,
@@ -153,6 +155,16 @@ mkdirSync(out, { recursive: true });
 writeFileSync(join(out, "productos.json"), JSON.stringify(prodApp));
 writeFileSync(join(out, "compradores.json"), JSON.stringify(compApp));
 writeFileSync(join(out, "metricas.json"), JSON.stringify(metricas));
+const conteo = Object.fromEntries(CATEGORIAS.map((c) => [c.id, 0]));
+for (const p of prodApp) conteo[p.ca]++;
+writeFileSync(join(out, "categorias.json"), JSON.stringify(CATEGORIAS.map((c) => ({ ...c, n: conteo[c.id] }))));
+// Lista para revisión del equipo
+const nombreCat = Object.fromEntries(CATEGORIAS.map((c) => [c.id, c.nombre]));
+const csv = ["codigo_material;descripcion_factura;nombre;forma_farmaceutica;categoria"]
+  .concat(prodApp.map((p) => [p.id, p.d, p.n, p.fo, nombreCat[p.ca]].map((x) => String(x).replace(/;/g, ",")).join(";")));
+mkdirSync(join(raiz, "..", "docs"), { recursive: true });
+writeFileSync(join(raiz, "..", "docs", "clasificacion_categorias.csv"), "\ufeff" + csv.join("\n"));
+console.log("Categorías:", conteo);
 
 const formas = {};
 for (const p of prodApp) formas[p.e] = (formas[p.e] || 0) + 1;

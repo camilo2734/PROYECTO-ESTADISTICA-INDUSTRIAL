@@ -7,7 +7,8 @@ export type Ruta =
   | { vista: "compradores"; filtro?: string }
   | { vista: "comprador"; id: string }
   | { vista: "como" }
-  | { vista: "canasta" };
+  | { vista: "canasta" }
+  | { vista: "catalogo"; cat?: string };
 
 export function leerRuta(): Ruta {
   // Anclas simples (#producto-300000712): compatibles con cualquier hosting y con visores que solo admiten #nombre.
@@ -18,6 +19,7 @@ export function leerRuta(): Ruta {
   if ((m = h.match(/^compradores(?:-(.+))?$/))) return { vista: "compradores", filtro: m[1] };
   if (h === "como-funciona") return { vista: "como" };
   if (h === "canasta") return { vista: "canasta" };
+  if ((m = h.match(/^productos(?:-(.+))?$/))) return { vista: "catalogo", cat: m[1] };
   return { vista: "inicio" };
 }
 
@@ -28,6 +30,7 @@ export const enlace = {
   compradores: (filtro?: string) => (filtro ? `#compradores-${filtro}` : "#compradores"),
   como: () => "#como-funciona",
   canasta: () => "#canasta",
+  catalogo: (cat?: string) => (cat ? `#productos-${cat}` : "#productos"),
 };
 
 export const ir = (href: string) => { window.location.hash = href.replace(/^#/, ""); };

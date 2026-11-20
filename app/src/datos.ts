@@ -6,7 +6,7 @@ export type Empaque =
   | "lata" | "spray" | "inyectable" | "tapabocas" | "equipo";
 
 export interface ProductoRaw {
-  id: string; n: string; pr: string; d: string; fo: string; e: Empaque; li: string;
+  id: string; n: string; pr: string; d: string; fo: string; ca: string; e: Empaque; li: string;
   iva: number; rx: 0 | 1; u: number; c: number; $: number;
   s: [number, number, number, number][]; // similares: [índice, compradores en común, lift, similitud]
   a: number[];                   // alternativas por contenido: [índice]
@@ -62,6 +62,10 @@ export function cargarCompradores() {
   });
   return compradoresP;
 }
+
+export interface Categoria { id: string; nombre: string; icono: string; n: number }
+let categoriasP: Promise<Categoria[]> | null = null;
+export const cargarCategorias = () => (categoriasP ??= json<Categoria[]>("categorias.json"));
 
 let metricasP: Promise<Metricas> | null = null;
 export const cargarMetricas = () => (metricasP ??= json<Metricas>("metricas.json"));
