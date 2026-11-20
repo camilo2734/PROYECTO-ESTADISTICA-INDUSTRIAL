@@ -48,6 +48,15 @@ export default function Inicio({ productos }: { productos: Producto[] }) {
             <span>Elige un comprador y mira su historial al lado de lo que le recomendamos.</span>
           </span>
         </a>
+        <a className="camino" href={enlace.canasta()}>
+          <span className="camino__icono" aria-hidden="true">
+            <svg viewBox="0 0 48 48"><path d="M8 16h32l-4 22H12z" /><path d="M17 16l7-9 7 9" /></svg>
+          </span>
+          <span>
+            <strong>Arma tu canasta</strong>
+            <span>Agrega varios productos y descubre qué los complementa.</span>
+          </span>
+        </a>
         <a className="camino" href={enlace.como()}>
           <span className="camino__icono" aria-hidden="true">
             <svg viewBox="0 0 48 48"><path d="M8 38h32" /><rect x="11" y="24" width="6" height="14" /><rect x="21" y="14" width="6" height="24" /><rect x="31" y="20" width="6" height="18" /></svg>

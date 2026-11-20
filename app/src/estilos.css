@@ -104,7 +104,7 @@ main { padding-bottom: 72px; min-height: 60vh; }
 .estante--esqueleto span { width: 90px; height: 110px; border-radius: 10px; background: var(--menta); animation: pulso 1.2s ease-in-out infinite alternate; }
 @keyframes pulso { to { opacity: 0.45; } }
 
-.inicio__caminos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 72px 0 0; }
+.inicio__caminos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 72px 0 0; }
 .camino { display: flex; gap: 16px; align-items: flex-start; padding: 22px; text-decoration: none; border-radius: var(--r-grande); background: var(--menta-clara); border: 1px solid var(--linea); }
 .camino:hover { border-color: var(--botica); background: var(--menta); }
 .camino strong { display: block; font-family: var(--display); font-size: 1.25rem; margin-bottom: 4px; }
@@ -220,6 +220,38 @@ main { padding-bottom: 72px; min-height: 60vh; }
 
 .pie { border-top: 1px solid var(--linea); padding: 24px 0 40px; color: var(--tinta-suave); font-size: 0.88rem; }
 
+
+/* ---------- Canasta ---------- */
+.nav-canasta { display: inline-flex; align-items: center; gap: 6px; }
+.insignia { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--ambar); color: #fff; font-size: 0.8rem; }
+.ficha__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: 18px; }
+.ficha__acciones .enlace-secundario { margin-top: 0; }
+.canasta { display: grid; grid-template-columns: minmax(300px, 0.85fr) 2fr; gap: 40px; margin-top: 28px; align-items: start; }
+.canasta__lista { position: sticky; top: 84px; padding: 20px; background: var(--menta-clara); border: 1px solid var(--linea); border-radius: var(--r-grande); display: flex; flex-direction: column; gap: 14px; }
+.canasta__cabeza { display: flex; justify-content: space-between; align-items: baseline; }
+.canasta__cabeza .seccion__titulo { margin: 0; font-size: 1.45rem; }
+.canasta__conteo { color: var(--tinta-suave); font-weight: 700; }
+.canasta__vacia p { color: var(--tinta-suave); margin-bottom: 10px; }
+.canasta__vacia ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ejemplo { font: inherit; text-align: left; width: 100%; padding: 10px 14px; border-radius: var(--r-medio); border: 1.5px dashed var(--botica); background: #fff; color: var(--botica-hondo); font-weight: 700; cursor: pointer; }
+.ejemplo:hover { background: var(--menta); }
+.canasta__items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.canasta__item { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--linea); border-radius: var(--r-medio); padding: 4px 8px 4px 4px; }
+.canasta__producto { flex: 1; display: flex; align-items: center; gap: 8px; text-decoration: none; min-width: 0; }
+.canasta__producto strong { display: block; font-size: 0.97rem; line-height: 1.25; }
+.canasta__producto small { display: block; color: var(--tinta-suave); font-size: 0.82rem; }
+.quitar { font: inherit; font-size: 0.88rem; font-weight: 700; color: var(--alerta); background: none; border: 0; padding: 6px 8px; cursor: pointer; border-radius: var(--r-chico); }
+.quitar:hover { background: #F4DCE5; }
+.canasta__metodo { font-size: 0.85rem; color: var(--tinta-suave); border-top: 1px solid var(--linea); padding-top: 12px; }
+.sugerencia { display: flex; flex-direction: column; gap: 8px; }
+.sugerencia .tarjeta { flex: 1; }
+.agregar { font: inherit; font-weight: 700; padding: 9px 12px; border-radius: var(--r-medio); border: 1.5px solid var(--botica); background: #fff; color: var(--botica-hondo); cursor: pointer; }
+.agregar:hover { background: var(--menta); }
+@media (max-width: 900px) {
+  .canasta { grid-template-columns: 1fr; }
+  .canasta__lista { position: static; }
+}
+
 /* ---------- Adaptación a pantallas pequeñas ---------- */
 @media (max-width: 900px) {
   .dos-columnas { grid-template-columns: 1fr; }
@@ -246,6 +278,10 @@ main { padding-bottom: 72px; min-height: 60vh; }
 }
 @media (max-width: 420px) {
   .marca span { display: none; }
+  .barra { gap: 8px 6px; padding: 10px 12px; }
+  .barra__nav { flex: 1; justify-content: space-between; gap: 0; margin-left: 0; }
+  .barra__nav a { white-space: nowrap; padding: 6px 6px; font-size: 0.78rem; letter-spacing: -0.01em; }
+  .insignia { min-width: 18px; height: 18px; font-size: 0.72rem; padding: 0 4px; }
   .tarjeta__imagen svg { width: 92px; height: 92px; }
   .tarjeta__nombre { font-size: 1rem; }
   .tarjeta__porque { font-size: 0.88rem; padding: 6px 8px; }

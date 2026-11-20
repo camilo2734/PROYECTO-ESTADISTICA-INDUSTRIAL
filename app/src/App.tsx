@@ -7,9 +7,12 @@ import ProductoVista from "./vistas/ProductoVista";
 import CompradoresVista from "./vistas/CompradoresVista";
 import CompradorVista from "./vistas/CompradorVista";
 import ComoFunciona from "./vistas/ComoFunciona";
+import CanastaVista from "./vistas/CanastaVista";
+import { useCanasta } from "./canasta";
 
 export default function App() {
   const ruta = useRuta();
+  const canasta = useCanasta();
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [indice, setIndice] = useState<IndiceCompradores | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +36,7 @@ export default function App() {
       inicio: "Vitrina | Recomendador de farmacia",
       compradores: "Elige un comprador | Vitrina",
       como: "Cómo funciona | Vitrina",
+      canasta: "Arma tu canasta | Vitrina",
     };
     if (titulos[ruta.vista]) document.title = titulos[ruta.vista];
     else if (ruta.vista === "producto" && productos) {
@@ -62,6 +66,9 @@ export default function App() {
           <a href={enlace.inicio()} aria-current={activo("inicio") || activo("producto")}>Productos</a>
           <a href={enlace.compradores()} aria-current={activo("compradores")}>Compradores</a>
           <a href={enlace.como()} aria-current={activo("como")}>Cómo funciona</a>
+          <a href={enlace.canasta()} aria-current={activo("canasta")} className="nav-canasta">
+            Canasta{canasta.items.length > 0 && <span className="insignia" aria-label={`${canasta.items.length} productos`}>{canasta.items.length}</span>}
+          </a>
         </nav>
       </header>
 
@@ -76,7 +83,8 @@ export default function App() {
           <div className="estante estante--esqueleto" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <span key={i} />)}</div>
           Preparando el catálogo…
         </main>
-      ) : ruta.vista === "producto" ? <ProductoVista productos={productos} id={ruta.id} />
+      ) : ruta.vista === "producto" ? <ProductoVista productos={productos} id={ruta.id} canasta={canasta} />
+        : ruta.vista === "canasta" ? <CanastaVista productos={productos} canasta={canasta} />
         : ruta.vista === "compradores" ? <CompradoresVista productos={productos} indice={indice} filtro={ruta.filtro} />
           : ruta.vista === "comprador" ? <CompradorVista productos={productos} indice={indice} id={ruta.id} />
             : ruta.vista === "como" ? <ComoFunciona />

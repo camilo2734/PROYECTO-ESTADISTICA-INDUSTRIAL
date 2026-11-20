@@ -123,8 +123,8 @@ const prodApp = productos.map((p) => ({
   u: p.unidades,
   c: p.compradores,
   $: p.precio,
-  // similares: [índice, compradores en común, lift]
-  s: (p.similares || []).map((x) => [idx.get(x.id), x.c, x.l]),
+  // similares: [índice, compradores en común, lift, similitud (coseno ajustado)]
+  s: (p.similares || []).map((x) => [idx.get(x.id), x.c, x.l, x.s]),
   // alternativas por contenido: [índice]
   a: (p.alternativas || []).map((x) => idx.get(x.id)).filter((i) => i !== undefined),
 }));
