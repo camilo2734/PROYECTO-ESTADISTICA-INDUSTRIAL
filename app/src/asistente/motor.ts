@@ -2,6 +2,7 @@
 // No usa servicios externos ni inventa productos: todo sale del catálogo y de los resultados exportados por R.
 import { buscar, cargarCompradores, normalizarTexto, pesos, type Categoria, type Producto } from "../datos";
 import { completarCanasta } from "../canasta";
+import { MALESTARES, NIVELES, type Nivel } from "../paquetes";
 import { enlace } from "../ruta";
 
 export interface ProductoRespuesta { p: Producto; nota?: string }
@@ -19,7 +20,7 @@ export interface Contexto {
   agregar: (idx: number) => void;
 }
 
-const SUGERENCIAS_INICIO = ["Algo para la tos", "Vitaminas para niños", "¿Qué compran con la metformina?", "Recomiéndame para mi canasta"];
+const SUGERENCIAS_INICIO = ["Tengo gripa fuerte", "Algo para la acidez", "Vitaminas para niños", "Recomiéndame para mi canasta"];
 
 // Necesidades frecuentes → categoría. Las palabras se comparan sin tildes.
 const NECESIDADES: [string, string[]][] = [
@@ -91,7 +92,7 @@ function respuestaProducto(encontrados: Producto[]): Respuesta {
   const p = encontrados[0];
   return {
     texto: encontrados.length > 1 ? "Encontré estos productos:" : "Encontré este producto:",
-    productos: encontrados.map((q) => ({ p: q, nota: notaRx(q) ?? (q.$ ? `Precio de referencia: ${pesos(q.$)}` : undefined) })),
+    productos: encontrados.map((q) => ({ p: q, nota: notaRx(q) ?? (q.$ ? pesos(q.$) : undefined) })),
     sugerencias: [`¿Qué compran con ${p.n}?`, `Agrega ${p.n} a la canasta`, "Ver mi canasta"],
   };
 }
@@ -112,7 +113,7 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
 
   // 2. Saludo, ayuda y agradecimiento
   if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|ayuda|ayudame|menu|que puedes hacer|que haces)\b/.test(t)) {
-    return { texto: "¡Hola! Soy Messi, el asistente de Vitrina. Puedo buscar productos por nombre, sugerirte opciones según lo que necesitas, decirte qué se compra junto con un producto y completar tu canasta. ¿Por dónde empezamos?", sugerencias: SUGERENCIAS_INICIO };
+    return { texto: "¡Hola! Soy Messi, el asistente de Vitrina. Puedo buscar productos, armarte un paquete según lo que sientes, decirte qué va bien con un producto y completar tu canasta. ¿Por dónde empezamos?", sugerencias: SUGERENCIAS_INICIO };
   }
   if (/^(gracias|muchas gracias|listo|ok|perfecto|vale)\b/.test(t)) {
     return { texto: "¡Con gusto! Si necesitas algo más, aquí estoy.", sugerencias: ["Ver mi canasta", "Lo más comprado"] };
@@ -126,8 +127,8 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
     const c = indice.porId.get(codigo[1]);
     if (!c) return { texto: `No encontré al comprador ${codigo[1]}. Revisa el código o elige uno de la lista.`, enlace: { texto: "Ver la lista de compradores", href: enlace.compradores() } };
     return {
-      texto: `El comprador ${c.id} ha comprado ${c.hi.length} productos distintos. Estas son sus principales recomendaciones, según los ${c.k} compradores más parecidos a él:`,
-      productos: c.r.slice(0, 4).map(([i, v]) => ({ p: productos[i], nota: `${v} de sus ${c.k} compradores parecidos lo compran` })),
+      texto: `El comprador ${c.id} ha comprado ${c.hi.length} productos distintos. Esto es lo que le sugerimos:`,
+      productos: c.r.slice(0, 4).map(([i]) => ({ p: productos[i], nota: productos[i].$ ? pesos(productos[i].$) : undefined })),
       enlace: { texto: "Ver su historial y todas sus recomendaciones", href: enlace.comprador(c.id) },
     };
   }
@@ -135,8 +136,8 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
   // 4. Cómo funciona
   if (/(como funciona|por que (me )?recomiend|como recomiend|algoritmo|coseno|como eligen|de donde salen)/.test(t)) {
     return {
-      texto: "Las recomendaciones salen de 250.748 facturas reales. Dos productos se consideran relacionados si los compran las mismas personas más de lo que se esperaría por azar (similitud de coseno ajustada). Para un comprador, busco a los 100 compradores con compras más parecidas a las suyas y le sugiero lo que ellos compran y él todavía no.",
-      enlace: { texto: "Ver cómo funciona y qué tan bien acierta", href: enlace.como() },
+      texto: "Te sugiero lo que suelen llevar juntos los clientes de Vitrina y lo que encaja con lo que necesitas, para que encuentres rápido lo que te sirve. Cuéntame qué buscas y lo vemos juntos.",
+      sugerencias: ["Tengo gripa fuerte", "Lo más comprado", "Ver mi canasta"],
     };
   }
 
@@ -162,8 +163,8 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
     }
     const sug = completarCanasta(productos, ctx.canasta, 4);
     return {
-      texto: sug.length ? `Tienes ${ctx.canasta.length} ${ctx.canasta.length === 1 ? "producto" : "productos"} en tu canasta. Esto es lo que mejor los complementa:` : "Los productos de tu canasta tienen pocas compras en común con otros, así que no tengo sugerencias con suficiente respaldo.",
-      productos: sug.map((s) => ({ p: s.p, nota: `Se compra junto con ${s.relacionados.map((r) => r.q.n).slice(0, 2).join(" y ")}` })),
+      texto: sug.length ? `Tienes ${ctx.canasta.length} ${ctx.canasta.length === 1 ? "producto" : "productos"} en tu canasta. Esto va muy bien con lo que llevas:` : "Ya tienes una buena canasta. ¿Quieres que te muestre lo más comprado?",
+      productos: sug.map((s) => ({ p: s.p, nota: `Va con ${s.relacionados[0].q.n}` })),
       enlace: { texto: "Ver mi canasta", href: enlace.canasta() },
     };
   }
@@ -172,10 +173,10 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
   if (/(que (mas )?(se )?(compran|compra|llevan|lleva)|junto con|combina|complement|parecido a|similar a|va con|acompan)/.test(t) && q) {
     const [p] = mejoresCoincidencias(productos, q, 1);
     if (p) {
-      if (!p.s.length) return { texto: `Muy pocas personas han comprado **${p.n}**, así que todavía no tengo productos relacionados con suficiente respaldo.`, productos: [{ p }] };
+      if (!p.s.length) return { texto: `Por ahora no tengo productos para sugerirte junto con **${p.n}**.`, productos: [{ p }] };
       return {
         texto: `Quienes compran **${p.n}** también suelen comprar:`,
-        productos: p.s.slice(0, 4).map(([i, c, l]) => ({ p: productos[i], nota: `${c.toLocaleString("es-CO")} compradores en común${l >= 1.2 ? `, ${l.toLocaleString("es-CO")} veces más de lo esperado` : ""}` })),
+        productos: p.s.slice(0, 4).map(([i]) => ({ p: productos[i], nota: productos[i].$ ? pesos(productos[i].$) : undefined })),
         enlace: { texto: `Ver ${p.n}`, href: enlace.producto(p.id) },
       };
     }
@@ -184,18 +185,42 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
   // 8. Lo más comprado
   if (/(mas (vendido|comprado|popular)|populares|lo que mas compran|recomiendame algo$|recomiendame$)/.test(t)) {
     const top = [...productos].sort((a, b) => b.c - a.c).filter((p, i, arr) => arr.findIndex((x) => x.n === p.n) === i).slice(0, 4);
-    return { texto: "Esto es lo que más compran las personas en Vitrina:", productos: top.map((p) => ({ p, nota: `Lo han comprado ${p.c.toLocaleString("es-CO")} personas` })) };
+    return { texto: "Esto es lo más vendido en Vitrina:", productos: top.map((p) => ({ p, nota: p.$ ? pesos(p.$) : undefined })) };
   }
 
   // 9. Precio
   if (/(precio|cuanto (cuesta|vale))/.test(t) && q) {
     const [p] = mejoresCoincidencias(productos, q, 1);
-    if (p) return { texto: p.$ ? `El precio de referencia de **${p.n}** (${p.pr}) es ${pesos(p.$)}. Es la mediana de lo que se pagó en las facturas.` : `No tengo precio registrado para **${p.n}**.`, productos: [{ p }] };
+    if (p) return { texto: p.$ ? `**${p.n}** (${p.pr}) cuesta ${pesos(p.$)}.` : `No tengo precio registrado para **${p.n}**.`, productos: [{ p }] };
+  }
+
+  // 9b. Malestar (con o sin nivel) → paquete, salvo que el mensaje nombre un producto concreto («klear tos»)
+  const coincidencias = mejoresCoincidencias(productos, q || t, 3);
+  const fuerte = coincidencias[0] && q.length >= 4 && normalizarTexto(coincidencias[0].n).includes(q);
+  const mal = MALESTARES.find((m) => m.claves.some((k) => new RegExp(`(^| )${k}`).test(t)));
+  const nivelDicho: Nivel | null = /\b(leve|suave|poquito|poco|ligera|ligero)\b/.test(t) ? "leve"
+    : /\b(fuerte|intens\w*|mucho|muy|grave|horrible|terrible|severa|severo)\b/.test(t) ? "fuerte"
+      : /\b(moderad\w*|normal|regular|media|medio)\b/.test(t) ? "moderado" : null;
+  const resto = q.split(" ").filter((w) => w.length > 2 && !mal?.claves.some((k) => k.includes(w)) &&
+    !/^(tengo|siento|estoy|leve|fuerte|moderad\w*|muy|mucho|suave|intens\w*|grave|dolor|duele)$/.test(w));
+  if (mal && !(fuerte && resto.length) && !/(que (mas )?(se )?(compran|compra)|junto con)/.test(t)) {
+    const nv = nivelDicho ?? "moderado";
+    const items = mal.niveles[nv].items.map((x) => productos.find((p) => p.id === x.id)).filter((p): p is Producto => !!p);
+    const total = items.reduce((s2, p) => s2 + p.$, 0);
+    const nombreNivel = NIVELES.find((x) => x.id === nv)!.nombre.toLowerCase();
+    const notas = new Map(mal.niveles[nv].items.map((x) => [x.id, x.para]));
+    const otros = NIVELES.filter((x) => x.id !== nv).map((x) => `${mal.nombre} ${x.nombre.toLowerCase()}`);
+    return {
+      texto: `${nivelDicho ? "Para" : "Si es moderado, para"} **${mal.nombre.toLowerCase()}** ${nivelDicho ? nombreNivel + " " : ""}te recomiendo este paquete (total ${pesos(total)}).` +
+        (nv === "fuerte" ? " Como tus síntomas son fuertes, consulta también a tu médico." : "") +
+        ` Si tienes señales de alarma, como ${mal.alarma[0]}, busca atención médica o llama a la línea **123**.`,
+      productos: items.map((p) => ({ p, nota: notas.get(p.id) })),
+      enlace: { texto: "Ver el paquete y agregarlo a la canasta", href: enlace.paquete(mal.id, nv) },
+      sugerencias: otros,
+    };
   }
 
   // 10. Producto nombrado con claridad (p. ej., «vitamina e 400»)
-  const coincidencias = mejoresCoincidencias(productos, q || t, 3);
-  const fuerte = coincidencias[0] && q.length >= 4 && normalizarTexto(coincidencias[0].n).includes(q);
   if (fuerte) return respuestaProducto(coincidencias);
 
   // 11. Necesidad o síntoma → categoría
@@ -246,6 +271,6 @@ export async function responder(mensaje: string, ctx: Contexto): Promise<Respues
 }
 
 export const MENSAJE_INICIAL: Respuesta = {
-  texto: "¡Hola! Soy Messi, el asistente de Vitrina. Cuéntame qué necesitas o qué producto buscas y te recomiendo opciones con base en lo que compran otras personas.",
+  texto: "¡Hola! Soy Messi, el asistente de Vitrina. Cuéntame qué sientes o qué producto buscas y te ayudo a encontrarlo. También puedo armarte un paquete según tu malestar.",
   sugerencias: SUGERENCIAS_INICIO,
 };

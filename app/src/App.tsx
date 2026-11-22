@@ -10,8 +10,12 @@ import CompradorVista from "./vistas/CompradorVista";
 import ComoFunciona from "./vistas/ComoFunciona";
 import CanastaVista from "./vistas/CanastaVista";
 import CatalogoVista from "./vistas/CatalogoVista";
+import MalestaresVista from "./vistas/MalestaresVista";
+import PaqueteVista from "./vistas/PaqueteVista";
+import PanelCanasta from "./componentes/PanelCanasta";
 import Asistente from "./asistente/Asistente";
 import { useCanasta } from "./canasta";
+import { malestarPorId } from "./paquetes";
 
 export default function App() {
   const ruta = useRuta();
@@ -44,6 +48,7 @@ export default function App() {
       compradores: "Elige un comprador | Vitrina",
       como: "Cómo funciona | Vitrina",
       canasta: "Tu canasta | Vitrina",
+      malestares: "¿Qué tienes? | Vitrina",
     };
     if (titulos[ruta.vista]) document.title = titulos[ruta.vista];
     else if (ruta.vista === "catalogo") {
@@ -52,8 +57,15 @@ export default function App() {
     } else if (ruta.vista === "producto" && productos) {
       const p = productos.find((x) => x.id === ruta.id);
       document.title = `${p ? p.n : "Producto"} | Vitrina`;
-    } else if (ruta.vista === "comprador") document.title = `Comprador ${ruta.id} | Vitrina`;
+    } else if (ruta.vista === "paquete") document.title = `${malestarPorId(ruta.malestar)?.nombre ?? "Paquete"} | Vitrina`;
+    else if (ruta.vista === "comprador") document.title = `Comprador ${ruta.id} | Vitrina`;
   }, [ruta, productos, categorias]);
+
+  // Lo agregado mientras el chat estaba abierto no abre el panel después
+  const { cerrarAviso } = canasta;
+  useEffect(() => { if (!asistente) cerrarAviso(); }, [asistente, cerrarAviso]);
+  // Al cambiar de página se cierra el panel
+  useEffect(() => { cerrarAviso(); }, [ruta, cerrarAviso]);
 
   const activo = (...vs: string[]) => (vs.includes(ruta.vista) ? "page" : undefined);
 
@@ -76,16 +88,15 @@ export default function App() {
         <nav className="barra__nav" aria-label="Secciones">
           <a href={enlace.inicio()} aria-current={activo("inicio")}><Icono n="inicio" tam={18} /><span>Inicio</span></a>
           <a href={enlace.catalogo()} aria-current={activo("catalogo", "producto")}><Icono n="productos" tam={18} /><span>Productos</span></a>
-          <a href={enlace.compradores()} aria-current={activo("compradores", "comprador")}><Icono n="compradores" tam={18} /><span>Compradores</span></a>
-          <a href={enlace.como()} aria-current={activo("como")}><Icono n="grafico" tam={18} /><span>Cómo funciona</span></a>
+          <a href={enlace.malestares()} aria-current={activo("malestares", "paquete")}><Icono n="termometro" tam={18} /><span>¿Qué tienes?</span></a>
         </nav>
         {ruta.vista !== "inicio" && productos && (
           <div className="barra__buscar"><Buscador productos={productos} placeholder="Buscar un producto…" /></div>
         )}
         <a href={enlace.canasta()} className="barra__carrito" aria-current={activo("canasta")}
-          aria-label={`Tu canasta: ${canasta.items.length} ${canasta.items.length === 1 ? "producto" : "productos"}`}>
+          aria-label={`Tu canasta: ${canasta.unidades} ${canasta.unidades === 1 ? "unidad" : "unidades"}`}>
           <Icono n="carrito" tam={24} />
-          <span className="insignia">{canasta.items.length}</span>
+          <span className="insignia">{canasta.unidades}</span>
         </a>
       </header>
 
@@ -104,16 +115,25 @@ export default function App() {
         : ruta.vista === "catalogo" ? <CatalogoVista productos={productos} categorias={categorias} canasta={canasta} cat={ruta.cat} />
         : ruta.vista === "canasta" ? <CanastaVista productos={productos} canasta={canasta} />
         : ruta.vista === "compradores" ? <CompradoresVista productos={productos} indice={indice} filtro={ruta.filtro} />
-        : ruta.vista === "comprador" ? <CompradorVista productos={productos} indice={indice} id={ruta.id} />
+        : ruta.vista === "comprador" ? <CompradorVista productos={productos} indice={indice} id={ruta.id} canasta={canasta} />
         : ruta.vista === "como" ? <ComoFunciona />
+        : ruta.vista === "malestares" ? <MalestaresVista productos={productos} />
+        : ruta.vista === "paquete" ? <PaqueteVista productos={productos} canasta={canasta} malestar={ruta.malestar} nivel={ruta.nivel} />
         : <Inicio productos={productos} categorias={categorias} canasta={canasta} abrirAsistente={() => setAsistente(true)} />}
+
+      {productos && <PanelCanasta productos={productos} canasta={canasta} visible={ruta.vista !== "canasta" && !asistente} />}
 
       {productos && (
         <Asistente abierto={asistente} setAbierto={setAsistente} productos={productos} categorias={categorias} canasta={canasta} />
       )}
 
       <footer className="pie">
-        <p>Proyecto 4 de Estadística Industrial, Universidad del Magdalena, 2026-II. Datos: facturas de un marketplace farmacéutico, 2013–2022.</p>
+        <p>Vitrina · Droguería inteligente</p>
+        <nav className="pie__enlaces" aria-label="Información del proyecto">
+          <a href={enlace.como()}>Cómo funciona</a>
+          <a href={enlace.compradores()}>Ver la tienda como un comprador</a>
+        </nav>
+        <p className="pie__proyecto">Proyecto 4 de Estadística Industrial, Universidad del Magdalena, 2026-II.</p>
       </footer>
     </>
   );

@@ -88,10 +88,6 @@ export default function CatalogoVista({ productos, categorias, canasta, cat }: P
               Ver más productos ({miles(lista.length - pagina * POR_PAGINA)} restantes)
             </button>
           )}
-          <p className="catalogo__nota">
-            Las categorías se asignaron a partir del nombre de cada producto en la factura. Los precios son de referencia:
-            la mediana del precio pagado en las facturas.
-          </p>
         </section>
       </div>
     </main>

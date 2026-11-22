@@ -35,6 +35,12 @@ const P: Record<string, JSX.Element> = {
   tapabocas: <><path d="M5 9c3-2 11-2 14 0v5c-3 3-11 3-14 0z" /><path d="M5 10H3v3l2 1M19 10h2v3l-2 1" /><path d="M8 11h8M8 13.5h8" /></>,
   huella: <><circle cx="7" cy="10" r="1.6" /><circle cx="10.5" cy="6.5" r="1.6" /><circle cx="14.5" cy="6.5" r="1.6" /><circle cx="17.5" cy="10" r="1.6" /><path d="M12 12c-2.5 0-5 3.5-5 5.5 0 1.5 1 2 2.5 2 1 0 1.5-.5 2.5-.5s1.5.5 2.5.5c1.5 0 2.5-.5 2.5-2 0-2-2.5-5.5-5-5.5z" /></>,
   dulce: <><circle cx="12" cy="12" r="4.5" /><path d="M7.7 10.6 3.5 8.5l1 7 3.2-2.1M16.3 10.6l4.2-2.1-1 7-3.2-2.1" /></>,
+  termometro: <><path d="M10 4a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z" /><path d="M12 10v6" /></>,
+  mas: <><path d="M12 5v14M5 12h14" /></>,
+  menos: <><path d="M5 12h14" /></>,
+  basura: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></>,
+  paquete: <><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M3 12h18M12 8v12M8 8c-2 0-3-1.2-3-2.5S6 3 7.5 3C10 3 12 8 12 8s2-5 4.5-5C18 3 19 4.2 19 5.5S18 8 16 8" /></>,
+  alerta: <><path d="M12 3 2 20h20z" /><path d="M12 10v4M12 17v.5" /></>,
   caja: <><path d="M4 8 12 4l8 4v8l-8 4-8-4z" /><path d="M4 8l8 4 8-4M12 12v8" /></>,
 };
 

@@ -6,6 +6,7 @@ import { enlace } from "../ruta";
 import Buscador from "../componentes/Buscador";
 import Icono from "../componentes/Icono";
 import TarjetaVenta, { type TipoInsignia } from "../componentes/TarjetaVenta";
+import { MALESTARES } from "../paquetes";
 
 interface Props {
   productos: Producto[];
@@ -74,7 +75,7 @@ export default function Inicio({ productos, categorias, canasta, abrirAsistente 
     if (canasta.items.length) {
       return completarCanasta(productos, canasta.items, 12).map((s, i) => ({
         p: s.p,
-        insignia: { texto: i < 3 ? "Alta afinidad" : "Complementario", tipo: (i < 3 ? "afinidad" : "complemento") as TipoInsignia },
+        insignia: { texto: i < 3 ? "Para ti" : "Va con tu canasta", tipo: (i < 3 ? "afinidad" : "complemento") as TipoInsignia },
         porque: <>Va con {s.relacionados[0].q.n}</>,
       }));
     }
@@ -94,7 +95,7 @@ export default function Inicio({ productos, categorias, canasta, abrirAsistente 
         <section className="portada2">
           <div className="portada2__texto">
             <h1>Tu droguería <span>inteligente</span></h1>
-            <p>Encuentra tus productos y recibe recomendaciones basadas en lo que compran miles de personas.</p>
+            <p>Encuentra tus productos, arma tu pedido y recibe sugerencias pensadas para ti.</p>
             <div className="portada2__buscar">
               <Buscador productos={productos} grande autoFocus placeholder="Busca un producto (ej.: vitamina C, loratadina)" />
             </div>
@@ -119,14 +120,15 @@ export default function Inicio({ productos, categorias, canasta, abrirAsistente 
               <Icono n="chat" tam={18} /> Iniciar chat
             </button>
           </section>
-          <section className="tarjeta-lateral porque-tarjeta">
-            <h2><Icono n="grafico" tam={20} /> ¿Por qué estas recomendaciones?</h2>
-            <ul>
-              <li><span><Icono n="juntos" tam={20} /></span>Se compran juntos con frecuencia.</li>
-              <li><span><Icono n="usuarios" tam={20} /></span>Personas con compras parecidas también los eligen.</li>
-              <li><span><Icono n="algoritmo" tam={20} /></span>Calculadas con el análisis estadístico de 250.748 facturas.</li>
-            </ul>
-            <a className="enlace-secundario" href={enlace.como()}>Ver cómo funciona</a>
+          <section className="tarjeta-lateral malestar-tarjeta">
+            <h2><Icono n="termometro" tam={22} /> ¿Qué tienes?</h2>
+            <p>Dinos qué sientes y qué tan fuerte es: te armamos un paquete listo para llevar.</p>
+            <div className="malestar-tarjeta__chips">
+              {MALESTARES.slice(0, 4).map((m) => (
+                <a key={m.id} href={enlace.paquete(m.id)} className="chip-rapido">{m.nombre}</a>
+              ))}
+            </div>
+            <a className="boton boton--ancho boton--claro" href={enlace.malestares()}>Ver todos los paquetes</a>
           </section>
         </aside>
       </div>
@@ -151,7 +153,7 @@ export default function Inicio({ productos, categorias, canasta, abrirAsistente 
             <p className="seccion__bajada">
               {canasta.items.length
                 ? "Productos que suelen comprarse junto con los de tu canasta."
-                : "Lo más comprado de cada categoría. Agrega productos a tu canasta y estas sugerencias se ajustan a ti."}
+                : "Lo más comprado de cada categoría. Agrega productos a tu canasta y verás sugerencias a tu medida."}
             </p>
           </div>
           <a className="boton-contorno" href={enlace.canasta()}>Ver mi canasta <Icono n="derecha" tam={16} /></a>
@@ -178,13 +180,13 @@ export default function Inicio({ productos, categorias, canasta, abrirAsistente 
       ))}
 
       <section className="inicio__caminos">
-        <a className="camino" href={enlace.compradores()}>
-          <span className="camino__icono" aria-hidden="true"><Icono n="compradores" tam={28} /></span>
-          <span><strong>Ver la tienda como un comprador</strong><span>Elige un comprador y mira su historial al lado de lo que le recomendamos.</span></span>
+        <a className="camino" href={enlace.malestares()}>
+          <span className="camino__icono" aria-hidden="true"><Icono n="termometro" tam={28} /></span>
+          <span><strong>¿Qué tienes?</strong><span>Elige tu malestar y su nivel, y llévate un paquete completo.</span></span>
         </a>
         <a className="camino" href={enlace.canasta()}>
           <span className="camino__icono" aria-hidden="true"><Icono n="carrito" tam={28} /></span>
-          <span><strong>Arma tu canasta</strong><span>Agrega varios productos y descubre qué los complementa.</span></span>
+          <span><strong>Tu canasta</strong><span>Revisa tu pedido, ajusta cantidades y mira el total.</span></span>
         </a>
         <button type="button" className="camino" onClick={abrirAsistente}>
           <span className="camino__icono" aria-hidden="true"><Icono n="robot" tam={28} /></span>

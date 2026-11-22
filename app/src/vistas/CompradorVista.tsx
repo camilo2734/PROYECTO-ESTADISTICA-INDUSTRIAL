@@ -2,11 +2,12 @@ import type { IndiceCompradores, Producto } from "../datos";
 import { mesAnio, miles } from "../datos";
 import { enlace } from "../ruta";
 import Empaque from "../componentes/Empaque";
-import Tarjeta from "../componentes/Tarjeta";
+import TarjetaVenta from "../componentes/TarjetaVenta";
+import type { Canasta } from "../canasta";
 
-interface Props { productos: Producto[]; indice: IndiceCompradores | null; id: string }
+interface Props { productos: Producto[]; indice: IndiceCompradores | null; id: string; canasta: Canasta }
 
-export default function CompradorVista({ productos, indice, id }: Props) {
+export default function CompradorVista({ productos, indice, id, canasta }: Props) {
   if (!indice) return <main className="cargando" role="status" id="contenido">Cargando el historial del comprador…</main>;
   const c = indice.porId.get(id);
   if (!c) {
@@ -18,7 +19,6 @@ export default function CompradorVista({ productos, indice, id }: Props) {
       </main>
     );
   }
-  const maxV = Math.max(1, ...c.r.map((r) => r[1]));
   const unidades = c.hi.reduce((s, h) => s + h[1], 0);
 
   return (
@@ -66,21 +66,18 @@ export default function CompradorVista({ productos, indice, id }: Props) {
 
         <section className="recomendaciones" aria-labelledby="t-recs">
           <h2 className="seccion__titulo" id="t-recs">Te puede interesar</h2>
-          <p className="seccion__bajada">
-            Buscamos los {c.k} compradores cuyas compras más se parecen a las tuyas y te mostramos lo que ellos compran y tú
-            todavía no.
-          </p>
+          <p className="seccion__bajada">Elegidos para ti a partir de lo que ya compraste.</p>
           {c.r.length === 0 ? (
-            <p className="nota">Con este historial no encontramos compradores parecidos suficientes para recomendar algo con confianza.</p>
+            <p className="nota">Todavía no tenemos sugerencias para ti. Mira lo más comprado en el inicio.</p>
           ) : (
-            <div className="rejilla rejilla--dos">
-              {c.r.map(([i, v, rel]) => {
+            <div className="rejilla-venta rejilla-venta--dos">
+              {c.r.map(([i, , rel], k) => {
                 const q = productos[i];
                 const relacionado = rel >= 0 ? productos[rel] : null;
                 return (
-                  <Tarjeta key={i} p={q} fuerza={v / maxV}
-                    porque={<>{v} de los {c.k} compradores más parecidos a ti lo compran.</>}
-                    detalle={relacionado ? <>Se relaciona con <em>{relacionado.n}</em>, que ya compraste</> : undefined} />
+                  <TarjetaVenta key={i} p={q} canasta={canasta}
+                    insignia={k < 3 ? { texto: "Para ti", tipo: "afinidad" } : undefined}
+                    porque={relacionado ? <>Va con {relacionado.n}, que ya compraste</> : undefined} />
                 );
               })}
             </div>
