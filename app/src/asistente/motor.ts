@@ -42,7 +42,8 @@ const NECESIDADES: [string, string[]][] = [
   ["dulces", ["dulce", "dulces", "gomas de dulce", "golosina"]],
 ];
 
-const URGENCIA = ["dolor de pecho", "dolor en el pecho", "no puedo respirar", "dificultad para respirar", "me ahogo", "desmay", "convuls",
+const URGENCIA = ["dolor de pecho", "dolor en el pecho", "duele el pecho", "duele en el pecho", "presion en el pecho", "opresion en el pecho",
+  "dolor fuerte en el pecho", "me falta el aire", "no puedo hablar", "se me duerme la cara", "perdi el conocimiento", "tome muchas pastillas", "no puedo respirar", "dificultad para respirar", "me ahogo", "desmay", "convuls",
   "sangrado abundante", "sangra mucho", "intoxic", "sobredosis", "envenen", "infarto", "derrame"];
 const CRISIS = ["suicid", "quitarme la vida", "hacerme dano", "no quiero vivir", "matarme"];
 
