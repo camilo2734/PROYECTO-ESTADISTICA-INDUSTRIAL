@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitácora de Uso de Inteligencia Artificial — Proyecto 4</title><style>
+:root{--ink:#2c3e50;--teal:#18bc9c;--bg:#fff;--card:#f4f4f4;--line:#ddd;--muted:#555}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#dfe7ee;--bg:#1b222a;--card:#242d37;--line:#3a4654;--muted:#a9b5c2}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;font-size:16px}
+.main{max-width:980px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:2rem;margin:.2em 0 .1em}h1.title{color:var(--ink)}
+h2{margin-top:1.8em;border-bottom:1px solid var(--line);padding-bottom:.2em}
+.subtitle{font-size:1.25rem;margin:.2em 0;color:var(--ink)}.author,.date{font-size:1rem;margin:.2em 0;color:var(--muted);font-weight:600}
+.bitacora-card{background:var(--card);border-left:6px solid #2c3e50;box-shadow:0 2px 6px rgba(0,0,0,.15);border-radius:6px;padding:16px 20px;margin-bottom:22px}
+.bitacora-card h4{margin:0 0 4px;color:var(--ink);font-size:1.1rem}
+.bitacora-meta{font-size:.9em;color:var(--muted);margin-bottom:10px;font-style:italic}
+.bitacora-field{margin-bottom:10px}
+.bitacora-field-label{font-weight:bold;color:#12957c;display:block;margin-bottom:2px}
+.bitacora-field p{margin:.3em 0}.bitacora-field ul{margin:.3em 0;padding-left:1.3em}
+.bitacora-completar{background:#fdecea;border:1px dashed #e74c3c;color:#c0392b;padding:6px 10px;border-radius:4px;font-weight:bold;display:inline-block}
+pre.prompt-rec{max-height:none}.badge-rec{display:inline-block;background:#fff3cd;color:#664d03;border:1px solid #e0a800;border-radius:4px;padding:2px 8px;font-size:.85rem;font-weight:bold}.nota-rec{font-size:.88rem;color:var(--muted);font-style:italic;margin:.2em 0 .6em}
+pre.prompt-full{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px;max-height:500px;overflow-y:auto;font:inherit;font-size:.92rem}
+details>summary{cursor:pointer;color:var(--ink);font-weight:bold;margin-top:6px}
+hr.dash{border:none;border-top:1px dashed #ccc;margin:14px 0}
+.integridad-box{background:#eaf6f6;color:#1b2f3a;border-left:6px solid #18bc9c;box-shadow:0 2px 6px rgba(0,0,0,.15);border-radius:6px;padding:18px 22px}
+.aviso{background:#fff7e0;color:#4a3b00;border-left:6px solid #e0a800;border-radius:6px;padding:14px 18px;margin:16px 0}
+.aviso h3{margin:0 0 6px}
+table.tabla{border-collapse:collapse;width:100%;font-size:.92rem;margin:.6em 0}
+.tabla th,.tabla td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.tabla th{background:var(--card)}
+code{background:rgba(127,127,127,.15);padding:1px 4px;border-radius:3px;font-size:.9em}
+.table-wrap{overflow-x:auto}
+@media print{.bitacora-card{break-inside:avoid}details[open] pre{max-height:none}}
+</style></head>
+<body><div class="main">
+<h1 class="title">Bitácora de Uso de Inteligencia Artificial</h1>
+<div class="subtitle">Proyecto 4: Sistema de recomendación para un marketplace farmacéutico</div>
+<div class="author">Camilo Henriquez, Mateo Valencia, Samuel Lopez y Valeria Gutierrez</div>
+<div class="date">Estadística Industrial (2026-II) · Docente: Enrique J. De La Hoz Domínguez · 21 de noviembre de 2026</div>
+
+<h1>Lineamientos metodológicos</h1>
+<p>Esta bitácora documenta el uso de inteligencia artificial como herramienta de apoyo en el Proyecto 4: un sistema de recomendación para un marketplace farmacéutico que adapta el tutorial de Ander Fernández a las facturas de Procaps (2013–2022), evalúa recomendadores colaborativos contra una línea base y los presenta en la aplicación web Vitrina. La herramienta de IA de cada actividad (Claude, Gemini y ChatGPT) <strong>fue indicada por el equipo</strong>: el repositorio no la identifica ni permite comprobarla. </p>
+<p>Para cada actividad se registran los siete puntos pedidos por el profesor: herramienta, prompt, resultado obtenido, qué se aceptó, qué se corrigió, justificación de las correcciones y validaciones del equipo. Se distingue entre lo que <strong>se observa en el repositorio</strong> y lo que <strong>solo el equipo puede confirmar</strong>. La existencia de una funcionalidad en el código no prueba que fue generada por una IA, y ningún resultado se atribuye automáticamente a ella.</p>
+<p>El ZIP del repositorio no contiene historiales de conversación ni la carpeta <code>docs/</code>. Por eso permite comprobar los resultados técnicos de cada entrada, pero no demuestra qué herramienta generó cada fragmento de código ni cuál fue el texto exacto de cada prompt.</p>
+<p>Las imágenes de producto de la aplicación no provienen de una herramienta de generación: son ilustraciones SVG dibujadas por código (<code>app/src/componentes/Empaque.tsx</code>), y el ZIP no contiene archivos de imagen. Por eso esta bitácora no incluye una entrada de generación de imágenes.</p>
+<p>Las entradas siguen el orden cronológico del proyecto. Las fechas de uso de IA (08/11/2026 al 20/11/2026) <strong>fueron indicadas por el equipo</strong>: el ZIP no permite comprobarlas. Solo dos fechas están respaldadas por archivos del repositorio: la del código base del profesor (9 de noviembre de 2026, <code>recbooks_original_profesor.Rmd</code>) y la de renderizado del <code>recomendador.html</code> (19/11/2026).</p>
+<p>La elaboración de esta bitácora fue asistida por Claude a partir del ZIP. Los datos de la actividad fueron leídos del repositorio; las cifras citadas se compararon con <code>app/datos-r/metricas.json</code>.</p>
+<hr>
+<h1>Resumen de entradas</h1>
+<div class="table-wrap"><table class="tabla"><thead><tr><th>N.º</th><th>Fecha</th><th>Fase</th><th>Actividad</th><th>Herramienta</th><th>Estado de la evidencia</th></tr></thead><tbody><tr><td><a href="#entrada-1">1</a></td><td>08/11/2026</td><td>Diagnóstico y planificación</td><td>Interpretación del enunciado, metodología y arquitectura</td><td>Claude (Anthropic)</td><td>Enunciado fuera del ZIP; interacción por confirmar</td></tr><tr><td><a href="#entrada-2">2</a></td><td>09/11/2026</td><td>Análisis en R</td><td>Reproducción del tutorial y 5 correcciones [CAMBIO]</td><td>Gemini (Google)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-3">3</a></td><td>12/11/2026</td><td>Análisis en R</td><td>Limpieza y unión de tablas (fase 2)</td><td>Claude (Anthropic)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-4">4</a></td><td>12/11/2026</td><td>Análisis en R</td><td>Preferencia implícita y matriz usuario–producto</td><td>ChatGPT (OpenAI)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-5">5</a></td><td>12/11/2026</td><td>Análisis en R</td><td>Similitud de coseno validada contra lsa::cosine</td><td>Claude (Anthropic)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-6">6</a></td><td>14/11/2026</td><td>Análisis en R</td><td>Ítem–ítem y coseno ajustado</td><td>Gemini (Google)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-7">7</a></td><td>14/11/2026</td><td>Análisis en R</td><td>Usuario–usuario</td><td>Claude (Anthropic)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-8">8</a></td><td>16/11/2026</td><td>Análisis en R</td><td>Evaluación contra la línea base</td><td>ChatGPT (OpenAI)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-9">9</a></td><td>17/11/2026</td><td>Análisis en R</td><td>Bonificación: contenido e híbrido</td><td>Claude (Anthropic)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-10">10</a></td><td>18/11/2026</td><td>Integración</td><td>Exportación a JSON</td><td>Gemini (Google)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-11">11</a></td><td>18/11/2026</td><td>Prototipo web</td><td>Estructura, datos y arquitectura</td><td>Claude (Anthropic)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-12">12</a></td><td>19/11/2026</td><td>Prototipo web</td><td>Vistas de la aplicación</td><td>Gemini (Google)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-13">13</a></td><td>20/11/2026</td><td>Prototipo web</td><td>Buscador y asistente (reglas)</td><td>Claude (Anthropic)</td><td>Código en el repositorio; interacción por confirmar</td></tr><tr><td><a href="#entrada-14">14</a></td><td>20/11/2026</td><td>Documentación</td><td>README, Rmd y validación final</td><td>Claude (Anthropic) y ChatGPT (OpenAI)</td><td>Informe y manual fuera del ZIP; interacción por confirmar</td></tr></tbody></table></div>
+<hr>
+<h1>Bitácora de interacciones</h1>
+<h2>Fase: Diagnóstico y planificación</h2>
+<div class="bitacora-card" id="entrada-1">
+<h4>Entrada 1 — Interpretación del enunciado, metodología y arquitectura</h4>
+<div class="bitacora-meta">Fecha: 08/11/2026 &nbsp;|&nbsp; Etapa: Diagnóstico y planificación &nbsp;|&nbsp; Herramienta: Claude (Anthropic)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Traducir el enunciado del Proyecto 4 en un plan de siete fases (más una bonificación) y en una arquitectura de dos partes: análisis estadístico en R y prototipo web que solo lee los resultados exportados.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Tengo el enunciado del Proyecto 4 de Estadística Industrial: adaptar un tutorial de sistemas de recomendación en R a las facturas de una empresa farmacéutica (Procaps) y presentar los resultados en una aplicación web. Ayúdame a ordenar el trabajo en las siete fases del enunciado, a decidir cómo evaluar los recomendadores contra una línea base de «los más vendidos» y a definir cómo pasar los resultados de R a la aplicación (por ejemplo, con archivos JSON).</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p>El enunciado, el cronograma y los archivos entregados por el profesor (salvo <code>analisis/referencia/recbooks_original_profesor.Rmd</code>, con fecha interna 9 de noviembre de 2026) <strong>no están en el ZIP</strong>. Lo que sí queda como producto de esta actividad: el Rmd declara que «sigue las siete fases del enunciado» (Parte I: fase 1; Parte II: fases 2 a 7), el <code>README.md</code> describe la arquitectura R → JSON (<code>app/datos-r/</code>) → aplicación React + TypeScript, y <code>firebase.json</code> y <code>.firebaserc</code> dejan configurada la publicación en Firebase Hosting.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Arquitectura de dos capas con el JSON como puente: la aplicación «no recalcula nada: solo lee y muestra» (comentario en <code>app/src/datos.ts</code>).</li><li>Partición temporal de la evaluación (entrenar hasta 2020, probar en 2021–2022).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>Sin evidencia en el ZIP de correcciones a una propuesta de IA en esta actividad. <strong>Pendiente de confirmación.</strong></li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>El README coincide con las cifras de <code>app/datos-r/metricas.json</code> (revisado al elaborar esta bitácora: 67,0 %, 65,4 % y 63,4 % de hit rate; McNemar 1,3 × 10⁻⁶).</li><li>Organización del trabajo y cronograma: <strong>sin evidencia</strong> en el repositorio.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Actividad con producto verificable en el repositorio; la interacción con la herramienta indicada debe confirmarla el equipo.</p></div>
+</div><hr><h2>Fase: Análisis estadístico en R</h2>
+<div class="bitacora-card" id="entrada-2">
+<h4>Entrada 2 — Reproducción del tutorial de Ander Fernández (fase 1)</h4>
+<div class="bitacora-meta">Fecha: 09/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R — Parte I &nbsp;|&nbsp; Herramienta: Gemini (Google)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Reproducir el tutorial «Cómo programar un sistema de recomendación en R» con la versión de Kaggle de Book-Crossing, partiendo del código del profesor, y dejar documentadas las modificaciones.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Estoy reproduciendo el tutorial de Ander Fernández «Cómo programar un sistema de recomendación en R» con el código que nos dio el profesor (recbooks_original_profesor.Rmd). Los datos de Book-Crossing los bajamos de Kaggle y los archivos tienen otros nombres y menos columnas que los del tutorial. Ayúdame a adaptar la lectura de datos y a revisar que los tres recomendadores (contenido con distancia de Gower, ítem–ítem y usuario–usuario) corran sin errores en un computador normal. Quiero que el Rmd marque con [CAMBIO] todo lo que se modifique respecto al código original y explique por qué.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 56–325. Cada modificación al código original se marca en el texto con la etiqueta <strong>[CAMBIO]</strong>, lo que permite separar lo heredado de lo cambiado.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Estructura de los tres recomendadores del tutorial (contenido, ítem–ítem, usuario–usuario).</li><li>Sección «Supuestos de cada recomendador del tutorial» (línea 312).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li><strong>Lectura por nombre explícito</strong> en vez de <code>list.files()</code> con índices (línea 68): el código base dependía del orden alfabético del sistema operativo.</li><li><strong>Gower sobre todos los libros no se ejecuta</strong> (<code>eval = FALSE</code>, línea 149): la matriz tendría del orden de miles de millones de celdas y no cabe en un computador normal; el bloque se conserva para mostrar el problema.</li><li><strong>Recomendador de contenido</strong> (líneas 202–203): se corrigió la unión con los libros leídos y se excluyen de la lista los libros que el usuario ya leyó.</li><li><strong><code>top_n(10000)</code> → 1.000 libros con más calificaciones</strong> (línea 227): <code>top_n()</code> ordena por la última columna y conserva todos los empates, así que no tomaba 10.000 filas sino todas las calificaciones iguales a 10.</li><li><strong>Error del código base en el ítem–ítem</strong> (línea 264): buscaba el libro en <code>rownames()</code>, pero las filas son usuarios; el índice salía vacío. Ahora busca en las columnas.</li><li>Quién detectó cada error (el equipo o una IA) <strong>no consta en el ZIP</strong>.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Cada <strong>[CAMBIO]</strong> viene con su justificación escrita en el propio documento.</li><li>El documento se renderiza completo (<code>recomendador.html</code>, 7,3 min de ejecución).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Cambios documentados y justificados. Autoría de cada detección por confirmar.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-3">
+<h4>Entrada 3 — Limpieza, unión y descripción de las tablas de Procaps (fase 2)</h4>
+<div class="bitacora-meta">Fecha: 12/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R — Parte II &nbsp;|&nbsp; Herramienta: Claude (Anthropic)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Cargar el detalle (<code>pro2.csv</code>) y la cabecera (<code>cab.csv</code>) de las facturas, unirlas sin perder ni duplicar líneas, fijar un nombre por producto y derivar la forma farmacéutica.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Tengo dos archivos de Procaps: pro2.csv (detalle de facturas) y cab.csv (cabecera). Están en Latin-1, con «;» como separador y punto como separador de miles. Necesito leerlos con readr, unirlos por invoice sin perder ni duplicar filas, dejar un nombre por producto (hay materiales con varias descripciones) y crear una variable de forma farmacéutica a partir de la descripción. Explícame qué tipo de join conviene y cómo comprobarlo.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 328–491. Base resultante (<code>metricas.json</code>): 496.375 líneas, 250.748 facturas, 5.888 compradores, 732 productos, del 12/07/2013 al 25/03/2022.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li><code>read_csv2()</code> con <code>locale(encoding = "latin1", grouping_mark = ".")</code> e identificadores leídos como texto para no perder ceros.</li><li><code>inner_join</code> por <code>invoice</code>, justificado con una tabla de verificación previa.</li><li>Nombre canónico = descripción con más unidades vendidas; la identidad del producto sigue siendo <code>Material</code>.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>La forma farmacéutica es una variable <strong>derivada con reglas de texto</strong> (línea 473, expresiones como <code>LATA|TARRO|BOTELLA</code>). El Rmd reconoce en «Limitaciones» que puede tener errores puntuales y que algunos productos quedan como «Otro».</li><li>Quién redactó las reglas de texto (equipo o IA): <strong>no consta</strong>.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Tabla de verificación: líneas, facturas repetidas en cabecera, líneas sin cabecera y cabeceras sin detalle.</li><li><code>stopifnot(nrow(compras) == nrow(detalle))</code>: la unión no pierde ni duplica filas.</li><li>Resumen descriptivo y revisión de las descripciones múltiples por <code>Material</code>.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Verificaciones presentes en el código. Falta confirmar la revisión manual de las reglas de forma farmacéutica.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-4">
+<h4>Entrada 4 — Preferencia implícita y matriz usuario–producto (fase 3)</h4>
+<div class="bitacora-meta">Fecha: 12/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R &nbsp;|&nbsp; Herramienta: ChatGPT (OpenAI)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Definir cómo representar el «gusto» de un comprador cuando no hay calificaciones, y construir la matriz compradores × 732 productos.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">En los datos de la farmacia no hay calificaciones, solo cantidades y facturas por comprador y producto. Quiero armar la matriz usuario–producto y comparar cómo definir la preferencia implícita: suma de unidades, facturas distintas, binaria y log(1 + cantidad). Me preocupa que un mayorista domine la similitud. Ayúdame a plantear un criterio para escoger una definición usando entrenamiento hasta 2019 y validación con 2020, sin tocar los datos de prueba.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 492–692. La matriz tiene dispersión de 94,98 % (<code>metricas.json</code>). El criterio de decisión está escrito en el documento.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Las cuatro definiciones y su tabla de sesgos.</li><li>Definición elegida: <strong>binaria</strong> (<code>configuracion.preferencia</code> en <code>metricas.json</code>).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>El criterio de decisión adoptado fue: promedio del hit rate de validación de los dos recomendadores colaborativos; las definiciones a menos de 0,5 puntos porcentuales de la mejor se consideran empatadas y entre ellas se elige la de menor <strong>dominancia</strong> mediana (cuánto depende la norma de un solo comprador).</li><li>La suma de unidades resultó la peor y la de mayor dominancia; la información de intensidad se conserva solo para ordenar el historial en la aplicación.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Validación sin tocar los datos de prueba: entrenar con compras hasta 2019 y validar con las de 2020.</li><li>Dispersión calculada sobre todas las celdas posibles (compradores × catálogo completo).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Decisión tomada por criterio estadístico explícito y reproducible.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-5">
+<h4>Entrada 5 — Similitud de coseno y validación contra lsa::cosine (fase 4)</h4>
+<div class="bitacora-meta">Fecha: 12/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R &nbsp;|&nbsp; Herramienta: Claude (Anthropic)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Implementar la similitud de coseno propia, comprobar que es correcta y calcular la matriz producto–producto de 732 × 732.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Necesito implementar la similitud de coseno entre productos a partir de la matriz usuario–producto. Quiero reutilizar la función cos_similarity del tutorial, comprobar que da lo mismo que lsa::cosine en algunos pares (incluido uno sin compradores en común) y calcular la matriz producto–producto completa con álgebra matricial para no llamar la función par por par. También explica por qué conviene exigir un mínimo de compradores en común.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 693–745.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Función <code>cos_similarity()</code> reutilizada del tutorial.</li><li>Cálculo matricial: columnas normalizadas a norma 1 y S = R̃ᵀR̃.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>Se agregó un <strong>soporte mínimo</strong> de compradores en común (<code>min_comunes</code>): un coseno alto con uno o dos compradores no es evidencia, puede ser coincidencia.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Cinco pares de productos validados contra <code>lsa::cosine</code>, incluido uno sin compradores en común (coseno esperado 0), con <code>stopifnot(diferencia &lt; 1e-12)</code>.</li><li>La matriz completa se compara con la función propia en 20 pares al azar (<code>set.seed(42)</code>).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Verificación numérica explícita en el código.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-6">
+<h4>Entrada 6 — Recomendador ítem–ítem, sesgo de popularidad y coseno ajustado (fase 5)</h4>
+<div class="bitacora-meta">Fecha: 14/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R &nbsp;|&nbsp; Herramienta: Gemini (Google)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Construir las recomendaciones «quien compró X también compró Y», revisar si tienen sentido farmacéutico y corregir el efecto de los productos muy populares.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Con la matriz de similitud de coseno quiero construir el recomendador ítem–ítem para los productos de la farmacia y revisar si las recomendaciones tienen sentido, por ejemplo vitamina E 1000 UI contra vitamina E 400, o clotrimazol tópico contra vaginal. Veo que los productos muy vendidos aparecen como vecinos de todo. Ayúdame a corregir el sesgo de popularidad con un coseno ajustado y a calcular el lift como medida complementaria.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 746–841. Parámetro exportado: <code>min_comunes_ajustado = 50</code>.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Coseno simple como recomendador ítem–ítem de la evaluación.</li><li>Coseno ajustado por popularidad y lift como medida complementaria para el usuario final.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>El <strong>coseno ajustado no superó la línea base</strong> en la evaluación (hit rate 63,1 % frente a 63,4 %; McNemar p = 0,743). Aun así se usa en la vista de producto de la aplicación porque da asociaciones con sentido farmacéutico, y el Rmd lo declara abiertamente.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Casos revisados a mano con criterio farmacéutico (sección «Casos analizados», línea 765).</li><li>Soporte mínimo elegido por validación (línea 950).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Se documenta un resultado desfavorable al método ajustado en vez de ocultarlo.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-7">
+<h4>Entrada 7 — Recomendador usuario–usuario (fase 6)</h4>
+<div class="bitacora-meta">Fecha: 14/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R &nbsp;|&nbsp; Herramienta: Claude (Anthropic)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Recomendar a cada comprador los productos que compran sus vecinos más parecidos y que él aún no tiene.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Ahora necesito el recomendador usuario–usuario: encontrar los k compradores más parecidos a uno dado y recomendarle los productos que ellos compran y él no. Ayúdame a programarlo con la misma matriz binaria, a elegir k y el umbral usando la partición de validación, y a incluir una comprobación de que no se recomienda nada que el comprador ya compró.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 842–901. Configuración final: <em>k</em> = 100, umbral = 1.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Algoritmo usuario–usuario con vecindario de <em>k</em> compradores.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li><em>k</em> y umbral se eligieron en validación (entrenar hasta 2019, validar 2020), no se dejaron los del tutorial. El desempeño sube hasta <em>k</em> = 100 y baja en 200 por el compromiso sesgo–varianza.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Sección «Comprobación: ¿se excluyen de verdad los productos ya comprados?» (línea 880) con un comprador de historial mediano (≈ 22 productos distintos).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Recomendador seleccionado como mejor modelo.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-8">
+<h4>Entrada 8 — Evaluación estadística frente a la línea base (fase 7)</h4>
+<div class="bitacora-meta">Fecha: 16/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R &nbsp;|&nbsp; Herramienta: ChatGPT (OpenAI)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Medir si los recomendadores superan a «los 10 más vendidos» con partición temporal, intervalos de confianza y pruebas de hipótesis.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Quiero evaluar los recomendadores contra la línea base de los 10 productos más vendidos, entrenando hasta 2020 y probando con 2021–2022. Propón las métricas (hit rate@10 y precision@10), cómo calcular intervalos de confianza y qué pruebas de hipótesis usar al comparar modelos sobre los mismos compradores (McNemar, t pareada, Wilcoxon). Ayúdame también a redactar la conclusión sin exagerar el efecto si la diferencia es pequeña.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 902–1084. Resultados (<code>metricas.json</code>, 2.533 compradores evaluados):</p>
+<table class="tabla"><thead><tr><th>Modelo</th><th>Hit rate@10 (IC 95 %)</th><th>Precision@10</th><th>McNemar</th></tr></thead><tbody>
+<tr><td>Línea base: 10 más vendidos</td><td>63,4 % (61,5–65,3)</td><td>0,112</td><td>—</td></tr>
+<tr><td>Ítem–ítem (coseno)</td><td>65,4 % (63,5–67,2)</td><td>0,121</td><td>p = 3 × 10⁻⁴</td></tr>
+<tr><td>Ítem–ítem (coseno ajustado)</td><td>63,1 % (61,2–65,0)</td><td>0,113</td><td>p = 0,743</td></tr>
+<tr><td><strong>Usuario–usuario, k = 100</strong></td><td><strong>67,0 % (65,1–68,8)</strong></td><td><strong>0,128</strong></td><td>p = 1,3 × 10⁻⁶</td></tr></tbody></table></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Diseño: línea base que excluye lo ya comprado (más exigente), versión sin exclusión solo como referencia (40,9 %).</li><li>IC 95 %, McNemar, t pareada unilateral y Wilcoxon.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>Conclusión matizada en el propio Rmd: la ganancia es significativa pero moderada (3,6 puntos porcentuales), porque la lista de lo más vendido ya es un predictor fuerte.</li><li>Los hiperparámetros se eligen en validación y la prueba final no se toca para ajustarlos.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Los números del README coinciden con <code>metricas.json</code> (comprobado al elaborar esta bitácora).</li><li>Sección de cobertura del catálogo (línea 1056) y lista de 8 limitaciones al final del Rmd.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Evaluación completa y consistente con lo publicado en el README.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-9">
+<h4>Entrada 9 — Bonificación: recomendador de contenido e híbrido</h4>
+<div class="bitacora-meta">Fecha: 17/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del análisis estadístico en R &nbsp;|&nbsp; Herramienta: Claude (Anthropic)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Describir cada producto con variables categóricas (distancia de Gower) y combinarlo con el colaborativo.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Para la bonificación quiero un recomendador por contenido para los productos de la farmacia usando distancia de Gower. Propón cómo trasladar las variables del tutorial (autor, categoría, editorial) al contexto farmacéutico, con qué pesos, y cómo combinarlo con el colaborativo en un híbrido con un parámetro alfa que se elija en validación.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 1085–1133. Pesos de Gower 2 / 1 / 0,5 / 0,5; α = 0,9 (<code>metricas.json</code>). Las «alternativas por contenido» alimentan la vista de producto.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Tabla de equivalencias libros ↔ farmacia.</li><li>Híbrido S = α·S<sub>colab</sub> + (1 − α)·S<sub>contenido</sub> con α elegido en validación.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>Reconocimiento explícito de que el contenido solo es débil para predecir compras nuevas, porque sus «parecidos» son otras presentaciones de lo que el comprador ya tiene.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Sensibilidad a α en {0; 0,25; 0,5; 0,75; 0,9; 1} y comparación contra la línea base en el conjunto de prueba.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Bonificación documentada con su limitación.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-10">
+<h4>Entrada 10 — Exportación de resultados a JSON para el prototipo</h4>
+<div class="bitacora-meta">Fecha: 18/11/2026 &nbsp;|&nbsp; Etapa: Integración R → aplicación web &nbsp;|&nbsp; Herramienta: Gemini (Google)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Exportar productos, compradores y métricas en JSON como único puente hacia la aplicación.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Necesito exportar desde el Rmd los resultados para la aplicación web: productos con sus similares, compradores con historial y recomendaciones, y las métricas de la evaluación. Propón un formato JSON compacto, porque el de compradores va a ser grande, y una verificación final de que ninguna recomendación exportada está en el historial del comprador.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>analisis/recomendador.Rmd</code>, líneas 1134–1224; archivos <code>app/datos-r/productos.json</code> (≈ 576 KB), <code>compradores.json</code> (≈ 11 MB) y <code>metricas.json</code> (≈ 2 KB). Parámetro <code>min_comunes_vista = 5</code>.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Estructura de los tres archivos y los tipos correspondientes en <code>app/src/datos.ts</code>.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>La vista de producto usa un soporte mínimo de 5 compradores en común, menor que el de la evaluación (50), para no dejar productos sin similares. El Rmd lo declara como limitación 8 y la tarjeta muestra siempre el número de compradores en común.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Verificación final (línea 1207): ninguna recomendación exportada está en el historial del comprador.</li><li>Tamaño de los archivos exportados listado al final del chunk.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Exportación verificada por código.</p></div>
+</div><hr><h2>Fase: Prototipo web Vitrina</h2>
+<div class="bitacora-card" id="entrada-11">
+<h4>Entrada 11 — Estructura, datos y arquitectura del prototipo Vitrina</h4>
+<div class="bitacora-meta">Fecha: 18/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del prototipo web &nbsp;|&nbsp; Herramienta: Claude (Anthropic)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Crear la aplicación base que carga los resultados de R, los prepara y se publica como sitio estático.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Vamos a hacer un prototipo web llamado Vitrina para mostrar los resultados del recomendador. Quiero usar React con TypeScript y Vite, que no recalcule nada sino que lea los JSON exportados desde R, y que se pueda publicar en Firebase Hosting. Ayúdame con la estructura de carpetas, un enrutador que funcione en hosting estático y un script que convierta los nombres de producto de la base (todo en mayúsculas y con abreviaturas) en nombres legibles.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>app/package.json</code> (React 18.3, TypeScript 5.9, Vite 5; fuentes Bricolage Grotesque y Atkinson Hyperlegible), <code>app/src/ruta.ts</code> (enrutador por hash, funciona en cualquier hosting estático), <code>app/src/datos.ts</code>, <code>app/scripts/preparar-datos.mjs</code> y <code>categorias.mjs</code> (nombres legibles, presentaciones, categorías y tipo de empaque; «no recalcula recomendaciones»), <code>firebase.json</code>.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Separación estricta: R calcula, la aplicación solo muestra.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li><code>preparar-datos.mjs</code> contiene listas de siglas, unidades y términos comerciales para dar formato legible a los nombres de Procaps; esa depuración es específica de estos datos. Quién la redactó: <strong>no consta</strong>.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Sin pruebas automáticas en el repositorio (no hay archivos de test). Verificación manual por el equipo: <strong>pendiente de confirmar</strong>.</li><li><code>npm run build</code> encadena <code>preparar-datos</code>, <code>tsc -b</code> y <code>vite build</code>, por lo que los errores de tipos bloquean la compilación.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>La existencia del código no prueba que lo generara una IA; la interacción debe confirmarla el equipo.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-12">
+<h4>Entrada 12 — Vistas de la aplicación: inicio, catálogo, producto, compradores, canasta y «Cómo funciona»</h4>
+<div class="bitacora-meta">Fecha: 19/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del prototipo web &nbsp;|&nbsp; Herramienta: Gemini (Google)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Implementar las vistas para explorar productos y compradores y mostrar las recomendaciones con una explicación comprensible.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Ayúdame a programar las vistas de Vitrina: inicio, catálogo por categorías, página de producto con los productos que se compran junto con él, lista de compradores con su historial y recomendaciones, una canasta de compras que sugiera productos que la complementen y una página «Cómo funciona» con las métricas de la evaluación. Cada recomendación debe decir por qué aparece, en lenguaje sencillo para alguien que no sabe estadística.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p>Siete vistas en <code>app/src/vistas/</code>, enrutadas en <code>App.tsx</code>:</p>
+<ul><li><strong>Inicio:</strong> si hay canasta, muestra lo que la complementa; si no, lo más comprado de cada categoría.</li>
+<li><strong>Catálogo:</strong> listado por categoría con paginación («Ver más productos»).</li>
+<li><strong>Producto:</strong> similares con el número de compradores que respalda cada sugerencia y, cuando hay pocos, alternativas por contenido.</li>
+<li><strong>Compradores / Comprador:</strong> primero los de historial típico (≈ 25 productos) y los mayoristas al final; historial y recomendaciones («X de los k compradores más parecidos a ti lo compran»).</li>
+<li><strong>Canasta:</strong> guardada en <code>localStorage</code> con respaldo en memoria; puntaje score<sub>j</sub> = Σ sim(i, j) con los 12 similares exportados por R.</li>
+<li><strong>Cómo funciona:</strong> métricas e intervalos de confianza leídos de <code>metricas.json</code>.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Diseño de interfaz y textos en lenguaje sencillo (<code>estilos.css</code>: tokens de color, contorno de foco visible).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>Decisiones de producto coherentes con las limitaciones del análisis: se muestra el soporte de cada sugerencia, se ordenan los compradores para no empezar por mayoristas.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Comportamiento ante fallos de carga: mensajes de error en <code>App.tsx</code> y <code>ComoFunciona.tsx</code>.</li><li>Pruebas funcionales realizadas por el equipo: <strong>pendientes de confirmar</strong> (el ZIP no las registra).</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Funcionalidades presentes; autoría y prompts por confirmar.</p></div>
+</div>
+<div class="bitacora-card" id="entrada-13">
+<h4>Entrada 13 — Buscador y asistente conversacional</h4>
+<div class="bitacora-meta">Fecha: 20/11/2026 &nbsp;|&nbsp; Etapa: Desarrollo del prototipo web &nbsp;|&nbsp; Herramienta: Claude (Anthropic)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Permitir buscar por nombre o por necesidad («algo para la tos») y obtener respuestas con productos reales del catálogo.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Quiero agregar a Vitrina un buscador por nombre con sugerencias, accesible con teclado, y un asistente que entienda frases como «algo para la tos» o «qué compran con la metformina». No quiero que use servicios externos ni que invente productos: que responda solo con el catálogo y los resultados de R. Si el mensaje parece una emergencia médica, que no ofrezca productos y remita a la línea 123.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><p><code>app/src/componentes/Buscador.tsx</code> (combobox accesible: flechas, Enter y Escape) y <code>app/src/asistente/motor.ts</code> + <code>Asistente.tsx</code>. <strong>El asistente no usa IA generativa ni servicios externos:</strong> es un motor de reglas (el asistente se presenta como «Messi») que compara el mensaje, sin tildes, con listas de palabras por necesidad (respiratoria, dolor, digestiva…) y responde con datos del catálogo.</p></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Reglas por necesidad → categoría y búsqueda de coincidencias por nombre.</li><li>Nota «Requiere fórmula médica» en productos con <code>rx</code>.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>Primero se evalúan los mensajes de urgencia médica y de crisis (listas <code>URGENCIA</code> y <code>CRISIS</code>): en esos casos el asistente responde con un aviso que remite a la línea de emergencias 123 y no ofrece productos.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li>Sin pruebas automáticas en el repositorio; revisión de respuestas de ejemplo por el equipo: <strong>pendiente de confirmar</strong>.</li><li>Cuidado con confundir esta función con el uso de IA como herramienta de desarrollo: la IA de esta bitácora es la que ayudó a escribir el proyecto, no la que corre dentro de la aplicación.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>Funcionalidad verificada por lectura del código; prompts y pruebas por confirmar.</p></div>
+</div><hr><h2>Fase: Documentación y ajustes finales</h2>
+<div class="bitacora-card" id="entrada-14">
+<h4>Entrada 14 — Documentación y validación final</h4>
+<div class="bitacora-meta">Fecha: 20/11/2026 &nbsp;|&nbsp; Etapa: Documentación y ajustes finales &nbsp;|&nbsp; Herramienta: Claude (Anthropic) y ChatGPT (OpenAI)</div>
+<div class="bitacora-field"><span class="bitacora-field-label">Objetivo</span><p>Apoyar la elaboración del <code>README.md</code> del proyecto, organizar la documentación (informe técnico, manual de uso y bitácora de IA) y comprobar que las cifras publicadas coinciden con las que exporta el Rmd en <code>metricas.json</code>.</p></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Prompt</span>
+<pre class="prompt-full prompt-rec">Ayúdame a redactar el README del proyecto con la estructura de carpetas, los resultados principales de la evaluación, cómo reproducir el análisis en RStudio y cómo ejecutar y publicar la aplicación. También ayúdame a organizar la documentación del proyecto (informe técnico, manual de uso y bitácora de uso de IA) y a revisar que las cifras del README coincidan con las que exporta el Rmd en metricas.json.</pre></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado observable en el repositorio</span><ul><li><code>README.md</code> con estructura de carpetas, resultados principales, cómo reproducir el análisis y cómo ejecutar y publicar la aplicación.</li><li>El propio Rmd antecede cada bloque con «qué hace» y «qué supuesto hace».</li><li>El README remite a <code>docs/bitacora_ia.md</code>, <code>docs/Informe_Tecnico_Proyecto4.docx</code> y al manual de uso. <strong>La carpeta <code>docs/</code> no está en el ZIP</strong>, por lo que desde el repositorio no es posible comprobar el contenido de esos documentos.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se aceptó</span><ul><li>Estructura del README en cuatro bloques: carpetas, resultados, reproducción en RStudio y ejecución y publicación de la aplicación.</li><li>Cifras del README iguales a las de <code>metricas.json</code>.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Qué se corrigió o modificó, y por qué</span><ul><li>Sin evidencia de correcciones a textos generados por IA en el repositorio.</li><li>Inconsistencia a resolver: el README cita <code>docs/bitacora_ia.md</code>, pero la bitácora anterior no se pudo recuperar y este documento es una elaboración nueva. Hay que actualizar esa referencia para que apunte a esta versión.</li></ul></div>
+<hr class="dash">
+<div class="bitacora-field"><span class="bitacora-field-label">Verificación aplicada</span><ul><li><strong>Comprobado en el repositorio:</strong> las cifras del README coinciden con <code>app/datos-r/metricas.json</code> (hit rate de 67,0 %, 65,4 % y 63,4 %; McNemar 1,3 × 10⁻⁶ para usuario–usuario frente a la línea base), y el Rmd documenta «qué hace» y «qué supuesto hace» en cada bloque.</li><li><strong>Requiere confirmación del equipo:</strong> que el informe técnico y el manual de uso existen, que sus cifras coinciden con las del README, y que la aplicación publicada corresponde a lo calculado. Ninguno de los tres está en el ZIP y esta bitácora no afirma haberlos revisado.</li></ul></div>
+<div class="bitacora-field"><span class="bitacora-field-label">Resultado</span><p>README completo y con cifras consistentes con <code>metricas.json</code>. La coherencia entre el repositorio y los documentos de <code>docs/</code> queda pendiente de la verificación del equipo.</p></div>
+</div><hr>
+<h1>Declaración de integridad</h1>
+<div class="integridad-box">
+<p>Declaro que el uso de inteligencia artificial durante el desarrollo de este proyecto ha sido documentado en la presente bitácora, de acuerdo con las instrucciones del curso: herramienta utilizada, prompt, resultado obtenido, partes aceptadas, partes corregidas con su justificación y validaciones realizadas por el equipo.</p>
+<p>Asumo la responsabilidad total sobre el código, los análisis y las interpretaciones estadísticas entregadas en este proyecto, incluidas las partes elaboradas con apoyo de IA. Entiendo que cualquier error derivado de una sugerencia de la IA se evalúa bajo el mismo criterio que si fuera de autoría enteramente propia.</p>
+<p><strong>Firman:</strong> Camilo Henriquez, Mateo Valencia, Samuel Lopez, Valeria Gutierrez<br><strong>Fecha:</strong> 21 de noviembre de 2026</p></div>
+</div></body></html>

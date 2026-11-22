@@ -16,8 +16,10 @@ app/
   scripts/               preparar-datos.mjs: da formato legible a nombres y presentaciones
   src/                   aplicación web (React + TypeScript)
 docs/
-  bitacora_ia.md         bitácora de uso de IA
-  Informe_Tecnico_Proyecto4.docx   informe técnico (máximo 8 páginas)
+  INFORME_TECNICO.pdf              informe técnico final
+  Manual_de_uso_Vitrina.pdf        manual de uso de la aplicación
+  Bitacora_uso_IA_Proyecto4.html   bitácora de uso de IA
+  clasificacion_categorias.csv     categoría asignada a cada producto
 firebase.json            configuración de Firebase Hosting
 ```
 
@@ -63,4 +65,4 @@ firebase deploy --only hosting
 
 ## Uso de IA
 
-Todo el uso de IA está registrado en [`docs/bitacora_ia.md`](docs/bitacora_ia.md): herramienta, prompt, qué se aceptó, qué se corrigió y por qué.
+Todo el uso de IA está registrado en [`docs/Bitacora_uso_IA_Proyecto4.html`](docs/Bitacora_uso_IA_Proyecto4.html): herramienta, prompt, qué se aceptó, qué se corrigió y por qué. En la entrega ZIP, el informe, el manual y la bitácora están en las carpetas 02_Informe, 03_Prototipo y 04_Bitacora_IA.
